@@ -1,0 +1,8 @@
+{
+    "provides": "btree",
+    "targets": {
+        "macos-aarch64": {},
+        "linux-x64": {},
+        "windows-x64": {}
+    }
+}
