@@ -1,10 +1,9 @@
-module btree(<Key, Val>);
+module btree{Key, Val};
 
 import std::core::builtin;
 
-def CmpFn = fn int(Key, Key, void*);
+alias CmpFn = fn int(Key, Key, void*);
 
-// CONSIDER: Rename this to avoid conflict with std lib.
 struct SearchResult
 {
     bool found;
@@ -126,16 +125,16 @@ macro void Map.@get_slots(&self, Key key; @body(bool existed, Key* key_slot, Val
 // macro void Map.@remove_if(&self, ???)
 // It could be same as @get_existing_slots but @body can return whether to remove or not.
 
-fn Val*! Map.get_ref(&self, Key key)
+fn Val*? Map.get_ref(&self, Key key)
 {
     self.@get_existing_slots(key; bool existed, Key* k, Val* v)
     {
-        if (!existed) return std::core::builtin::SearchResult.MISSING?;
+        if (!existed) return NOT_FOUND?;
         return v;
     };
 }
 
-fn Val! Map.get(&self, Key key) @operator([])
+fn Val? Map.get(&self, Key key) @operator([])
 {
     return *self.get_ref(key);
 }

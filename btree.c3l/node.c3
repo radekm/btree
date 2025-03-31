@@ -1,4 +1,4 @@
-module btree(<Key, Val>);
+module btree{Key, Val};
 
 const usz B = 6;
 const usz CAPACITY = 2 * B - 1;
@@ -162,7 +162,7 @@ fn HandleKV HandleEdge.insert_fit_into_leaf(self, Key key, Val val)
     slice_insert_val(node.vals[:cur_len], self.edge_idx, val);
     node.len++;
 
-    return HandleKV { .node_ref = self.node_ref, .kv_idx = self.edge_idx };
+    return (HandleKV) { .node_ref = self.node_ref, .kv_idx = self.edge_idx };
 }
 
 // Result of insertion, when a node needed to expand beyond its capacity.

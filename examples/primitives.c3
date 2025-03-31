@@ -15,7 +15,7 @@ fn int compare_strings(String a, String b, void* ctx)
 
 fn void main()
 {
-    btree::Map(<String, int>) m;
+    btree::Map{String, int} m;
 
     m.init(&compare_strings);
     m.@get_slots("nose"; bool existed, String* k, int* v)
