@@ -1,0 +1,57 @@
+on: [push]
+
+jobs:
+  build-and-test-in-bash:
+    strategy:
+      # Continue build even if some platforms fail.
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            arch: arm64
+          - os: ubuntu-latest
+            arch: x64
+          - os: windows-latest
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    name: Build and test in Bash
+    steps:
+      - name: Ensure same LF line endings on all platforms
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+      - uses: actions/checkout@v4
+      - uses: radekm/setup-c3@v2
+        with:
+          version: v0.7.0
+      - shell: bash
+        run: |
+          ./build.sh
+
+          ls -l build
+  build-and-test-in-cmd:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    name: Build and test in cmd
+    steps:
+      - name: Ensure same LF line endings on all platforms
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+      - uses: actions/checkout@v4
+      - uses: radekm/setup-c3@v2
+        with:
+          version: v0.7.0
+      - shell: cmd
+        run: |
+          md build
+          cd build
+
+          c3c compile --libdir .. --lib btree ..\examples\basics.c3 -o basics
+          c3c compile --libdir .. --lib btree ..\examples\primitives.c3 -o primitives
+
+          dir
