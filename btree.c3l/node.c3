@@ -1,9 +1,9 @@
-module btree{Key, Val};
+module btree{Type};
 
 const usz B = 6;
 const usz CAPACITY = 2 * B - 1;
 const usz MIN_LEN_AFTER_SPLIT = B - 1;
-const usz KV_IDX_CENTER = B - 1;
+const usz ITEM_IDX_CENTER = B - 1;
 const usz EDGE_IDX_LEFT_OF_CENTER = B - 1;
 const usz EDGE_IDX_RIGHT_OF_CENTER = B;
 
@@ -16,13 +16,12 @@ struct LeafNode
     // This is only guaranteed to be initialized when `parent` is non-null.
     ushort parent_edge_idx;
 
-    // The number of keys and values this node stores.
+    // The number items this node stores.
     ushort len;
 
-    // The arrays storing the actual data of the node. Only the first `len` elements of each
-    // array are initialized and valid.
-    Key[CAPACITY] keys;
-    Val[CAPACITY] vals;
+    // The array storing the actual data of the node. Only the first `len` elements
+    // are initialized and valid.
+    Type[CAPACITY] items;
 }
 
 struct InternalNode
@@ -49,19 +48,19 @@ struct NodeRef
     LeafNode* node;
 }
 
-// A reference to a specific key-value pair.
-struct HandleKV
+// A reference to a specific item.
+struct HandleItem
 {
     NodeRef node_ref;
-    usz kv_idx;
+    usz item_idx;
 }
 
 // A reference to a specific edge within a node.
 //
 // Note that even leaf nodes can have edge handles. Instead of representing a pointer to
-// a child node, these represent the spaces where child pointers would go between the key-value
-// pairs. For example, in a node with length 2, there would be 3 possible edge locations - one
-// to the left of the node, one between the two pairs, and one at the right of the node.
+// a child node, these represent the spaces where child pointers would go between the items.
+// For example, in a node with length 2, there would be 3 possible edge locations - one
+// to the left of the node, one between the two items, and one at the right of the node.
 struct HandleEdge
 {
     NodeRef node_ref;  // Parent node. Child node may not exist if the parent is a leaf.
@@ -74,17 +73,17 @@ struct HandleEdge
 
 struct SplitPoint
 {
-    usz middle_kv_idx;
+    usz middle_item_idx;
     usz insert_idx;
     // Determines whether `insert_idx` is edge index in the left or in the right part.
     bool insert_into_left;
 }
 
 // Given an edge index where we want to insert into a node filled to capacity,
-// computes a sensible KV index of a split point and where to perform the insertion.
-// The goal of the split point is for its key and value to end up in a parent node;
-// the keys, values and edges to the left of the split point become the left child;
-// the keys, values and edges to the right of the split point become the right child.
+// computes a sensible item index of a split point and where to perform the insertion.
+// The goal of the split point is for its item to end up in a parent node;
+// the items and edges to the left of the split point become the left child;
+// the items and edges to the right of the split point become the right child.
 <*
  @require edge_idx <= CAPACITY
 *>
@@ -95,43 +94,29 @@ fn SplitPoint split_point(usz edge_idx)
     {
         // Insert into the left node.
         case edge_idx < EDGE_IDX_LEFT_OF_CENTER:
-            return { KV_IDX_CENTER - 1, edge_idx, true };
+            return { ITEM_IDX_CENTER - 1, edge_idx, true };
         case edge_idx == EDGE_IDX_LEFT_OF_CENTER:
-            return { KV_IDX_CENTER, edge_idx, true };
+            return { ITEM_IDX_CENTER, edge_idx, true };
         // Insert into the right node.
         case edge_idx == EDGE_IDX_RIGHT_OF_CENTER:
-            return { KV_IDX_CENTER, 0, false };
+            return { ITEM_IDX_CENTER, 0, false };
         default:
-            return { KV_IDX_CENTER + 1, edge_idx - (KV_IDX_CENTER + 1 + 1), false };
+            return { ITEM_IDX_CENTER + 1, edge_idx - (ITEM_IDX_CENTER + 1 + 1), false };
     }
 }
 
-// `keys` is the slice with existing keys.
+// `items` is the slice with existing items.
 <*
  @require at < CAPACITY
 *>
-fn void slice_insert_key(Key[] keys, usz at, Key key)
+fn void slice_insert_item(Type[] items, usz at, Type item)
 {
-    if (keys.len != at)
+    if (items.len != at)
     {
         // We need to move elements.
-        mem::move(keys.ptr + at + 1, keys.ptr + at, (keys.len - at) * Key.sizeof);
+        mem::move(items.ptr + at + 1, items.ptr + at, (items.len - at) * Type.sizeof);
     }
-    keys.ptr[at] = key;
-}
-
-// `vals` is the slice with existing values.
-<*
- @require at < CAPACITY
-*>
-fn void slice_insert_val(Val[] vals, usz at, Val val)
-{
-    if (vals.len != at)
-    {
-        // We need to move elements.
-        mem::move(vals.ptr + at + 1, vals.ptr + at, (vals.len - at) * Val.sizeof);
-    }
-    vals.ptr[at] = val;
+    items.ptr[at] = item;
 }
 
 // `edges` is the slice with existing edges.
@@ -148,21 +133,19 @@ fn void slice_insert_edge(LeafNode*[] edges, usz at, LeafNode* edge)
     edges.ptr[at] = edge;
 }
 
-// Inserts a new key-value pair between the key-value pairs to the right and left of
-// this edge. This method assumes that there is enough space in the node for the new
-// pair to fit.
+// Inserts a new item between the items to the right and left of
+// this edge. This function assumes that there is enough space in the node for the item to fit.
 <*
  @require self.node_ref.node.len < CAPACITY
 *>
-fn HandleKV HandleEdge.insert_fit_into_leaf(self, Key key, Val val)
+fn HandleItem HandleEdge.insert_fit_into_leaf(self, Type item)
 {
     LeafNode* node = self.node_ref.node;
     usz cur_len = node.len;
-    slice_insert_key(node.keys[:cur_len], self.edge_idx, key);
-    slice_insert_val(node.vals[:cur_len], self.edge_idx, val);
+    slice_insert_item(node.items[:cur_len], self.edge_idx, item);
     node.len++;
 
-    return (HandleKV) { .node_ref = self.node_ref, .kv_idx = self.edge_idx };
+    return { .node_ref = self.node_ref, .item_idx = self.edge_idx };
 }
 
 // Result of insertion, when a node needed to expand beyond its capacity.
@@ -170,39 +153,36 @@ fn HandleKV HandleEdge.insert_fit_into_leaf(self, Key key, Val val)
 // If `left.node` or `right.node` is null then there's no split result.
 struct SplitResult
 {
-    // Altered node in existing tree with elements and edges that belong to the left of kv.
+    // Altered node in existing tree with elements and edges that belong to the left of item.
     NodeRef left;
-    // Unattached, new node with elements and edges that belong to the right of kv.
+    // Unattached, new node with elements and edges that belong to the right of item.
     NodeRef right;
 
-    // Some key and value that existed before and were split off, to be inserted elsewhere.
-    Key key;
-    Val val;
+    // Some item that existed before and were split off, to be inserted elsewhere.
+    Type item;
 }
 
 // Splits the underlying node into three parts:
 //
-// - The node is truncated to only contain the key-value pairs to the left of
+// - The node is truncated to only contain the items to the left of
 //   this handle.
-// - The key and value pointed to by this handle are extracted.
-// - All the key-value pairs to the right of this handle are put into a newly
+// - The item pointed to by this handle is extracted.
+// - All the items to the right of this handle are put into a newly
 //   allocated node.
-fn SplitResult HandleKV.split_leaf(self, Allocator allocator)
+fn SplitResult HandleItem.split_leaf(self, Allocator allocator)
 {
     LeafNode* orig_node = self.node_ref.node;  // Left node.
 
     SplitResult result;
     result.left = self.node_ref;
-    result.key = orig_node.keys[self.kv_idx];
-    result.val = orig_node.vals[self.kv_idx];
+    result.item = orig_node.items[self.item_idx];
 
     LeafNode* new_node = allocator::alloc(allocator, LeafNode);  // Right node.
-    new_node.len = orig_node.len - (ushort)self.kv_idx - 1;
-    mem::copy(&new_node.keys, &orig_node.keys[self.kv_idx + 1], new_node.len * Key.sizeof);
-    mem::copy(&new_node.vals, &orig_node.vals[self.kv_idx + 1], new_node.len * Val.sizeof);
+    new_node.len = orig_node.len - (ushort)self.item_idx - 1;
+    mem::copy(&new_node.items, &orig_node.items[self.item_idx + 1], new_node.len * Type.sizeof);
     result.right.node = new_node;
 
-    orig_node.len = (ushort)self.kv_idx;
+    orig_node.len = (ushort)self.item_idx;
 
     return result;
 }
@@ -210,29 +190,29 @@ fn SplitResult HandleKV.split_leaf(self, Allocator allocator)
 struct InsertIntoLeafResult
 {
     SplitResult split;
-    HandleKV handle;
+    HandleItem handle;
 }
 
-// Inserts a new key-value pair between the key-value pairs to the right and left of
+// Inserts a new item between the items to the right and left of
 // this edge. This method splits the node if there isn't enough room.
-fn InsertIntoLeafResult HandleEdge.insert_into_leaf(self, Key key, Val val, Allocator allocator)
+fn InsertIntoLeafResult HandleEdge.insert_into_leaf(self, Type item, Allocator allocator)
 {
     InsertIntoLeafResult insert_result;
 
     if (self.node_ref.node.len < CAPACITY)
     {
-        insert_result.handle = self.insert_fit_into_leaf(key, val);
+        insert_result.handle = self.insert_fit_into_leaf(item);
     }
     else
     {
         SplitPoint sp = split_point(self.edge_idx);
-        HandleKV middle = { .node_ref = self.node_ref, .kv_idx = sp.middle_kv_idx };
+        HandleItem middle = { .node_ref = self.node_ref, .item_idx = sp.middle_item_idx };
         insert_result.split = middle.split_leaf(allocator);
         HandleEdge insertion_edge = {
             .node_ref = sp.insert_into_left ? insert_result.split.left : insert_result.split.right,
             .edge_idx = sp.insert_idx,
         };
-        insert_result.handle = insertion_edge.insert_fit_into_leaf(key, val);
+        insert_result.handle = insertion_edge.insert_fit_into_leaf(item);
     }
 
     return insert_result;
@@ -252,19 +232,18 @@ fn void InternalNode.correct_childrens_parent_links(&self, usz from, usz to_excl
 // TODO: Why has `edge` parameter in `insert_fit_into_internal` type `NodeRef`
 //       instead of `LeafNode*`. We use it to check height but is that necessary?
 
-// Inserts a new key-value pair and an edge that will go to the right of that new pair
-// between this edge and the key-value pair to the right of this edge. This method assumes
-// that there is enough space in the node for the new pair to fit.
+// Inserts a new item and an edge that will go to the right of that new item
+// between this edge and the item to the right of this edge. This method assumes
+// that there is enough space in the node for the new item to fit.
 <*
  @require self.node_ref.node.len < CAPACITY
  @require edge.height == self.node_ref.height - 1
 *>
-fn void HandleEdge.insert_fit_into_internal(self, Key key, Val val, NodeRef edge)
+fn void HandleEdge.insert_fit_into_internal(self, Type item, NodeRef edge)
 {
     LeafNode* node = self.node_ref.node;
     usz cur_len = node.len;
-    slice_insert_key(node.keys[:cur_len], self.edge_idx, key);
-    slice_insert_val(node.vals[:cur_len], self.edge_idx, val);
+    slice_insert_item(node.items[:cur_len], self.edge_idx, item);
     InternalNode* internal_node = (InternalNode*)node;
     slice_insert_edge(internal_node.edges[:cur_len+1], self.edge_idx + 1, edge.node);
     node.len++;
@@ -272,67 +251,63 @@ fn void HandleEdge.insert_fit_into_internal(self, Key key, Val val, NodeRef edge
     internal_node.correct_childrens_parent_links(self.edge_idx + 1, (usz)node.len + 1);
 }
 
-fn SplitResult HandleKV.split_internal(self, Allocator allocator)
+fn SplitResult HandleItem.split_internal(self, Allocator allocator)
 {
     InternalNode* orig_node = (InternalNode*)self.node_ref.node;  // Left node.
 
     SplitResult result;
     result.left = self.node_ref;
-    result.key = orig_node.data.keys[self.kv_idx];
-    result.val = orig_node.data.vals[self.kv_idx];
+    result.item = orig_node.data.items[self.item_idx];
 
     InternalNode* new_node = allocator::alloc(allocator, InternalNode);  // Right node.
-    new_node.data.len = orig_node.data.len - (ushort)self.kv_idx - 1;
-    mem::copy(&new_node.data.keys, &orig_node.data.keys[self.kv_idx + 1], new_node.data.len * Key.sizeof);
-    mem::copy(&new_node.data.vals, &orig_node.data.vals[self.kv_idx + 1], new_node.data.len * Val.sizeof);
-    mem::copy(&new_node.edges, &orig_node.edges[self.kv_idx + 1], ((usz)new_node.data.len + 1) * (LeafNode*).sizeof);
+    new_node.data.len = orig_node.data.len - (ushort)self.item_idx - 1;
+    mem::copy(&new_node.data.items, &orig_node.data.items[self.item_idx + 1], new_node.data.len * Type.sizeof);
+    mem::copy(&new_node.edges, &orig_node.edges[self.item_idx + 1], ((usz)new_node.data.len + 1) * (LeafNode*).sizeof);
     result.right.node = &new_node.data;
     result.right.height = self.node_ref.height;
 
-    orig_node.data.len = (ushort)self.kv_idx;  // CONSIDER: Shall we set moved keys and values to zero?
+    orig_node.data.len = (ushort)self.item_idx;  // CONSIDER: Shall we set moved out items to zero?
 
     return result;
 }
 
-// Inserts a new key-value pair and an edge that will go to the right of that new pair
-// between this edge and the key-value pair to the right of this edge. This method splits
+// Inserts a new item and an edge that will go to the right of that new item
+// between this edge and the item to the right of this edge. This method splits
 // the node if there isn't enough room.
 <*
  @require edge.height == self.node_ref.height - 1
 *>
-fn SplitResult HandleEdge.insert_into_internal(self, Key key, Val val, NodeRef edge, Allocator allocator)
+fn SplitResult HandleEdge.insert_into_internal(self, Type item, NodeRef edge, Allocator allocator)
 {
     SplitResult split_result;
 
     if (self.node_ref.node.len < CAPACITY)
     {
-        self.insert_fit_into_internal(key, val, edge);
+        self.insert_fit_into_internal(item, edge);
     }
     else
     {
         SplitPoint sp = split_point(self.edge_idx);
-        HandleKV middle = { .node_ref = self.node_ref, .kv_idx = sp.middle_kv_idx };
+        HandleItem middle = { .node_ref = self.node_ref, .item_idx = sp.middle_item_idx };
         split_result = middle.split_internal(allocator);
         HandleEdge insertion_edge = {
             .node_ref = sp.insert_into_left ? split_result.left : split_result.right,
             .edge_idx = sp.insert_idx,
         };
-        insertion_edge.insert_fit_into_internal(key, val, edge);
+        insertion_edge.insert_fit_into_internal(item, edge);
     }
 
     return split_result;
 }
 
-// Inserts a new key-value pair between the key-value pairs to the right and left of
+// Inserts a new item between the items to the right and left of
 // this edge. This method splits the node if there isn't enough room, and tries to
 // insert the split off portion into the parent node recursively, until the root is reached.
 //
-// If the returned result is some `SplitResult`, the `left` field will be the root node.
-// The returned pointer points to the inserted value, which in the case of `SplitResult`
-// is in the `left` or `right` tree.
-fn HandleKV HandleEdge.insert_into_leaf_recursing_up(self, Key key, Val val, NodeRef* orig_root, Allocator allocator)
+// Returns handle pointing to the newly inserted item.
+fn HandleItem HandleEdge.insert_into_leaf_recursing_up(self, Type item, NodeRef* orig_root, Allocator allocator)
 {
-    InsertIntoLeafResult insert_result = self.insert_into_leaf(key, val, allocator);
+    InsertIntoLeafResult insert_result = self.insert_into_leaf(item, allocator);
 
     // No split has been performed.
     if (insert_result.split.left.node == null) return insert_result.handle;
@@ -352,12 +327,12 @@ fn HandleKV HandleEdge.insert_into_leaf_recursing_up(self, Key key, Val val, Nod
                     .height = split.left.height + 1,
                     .node = (LeafNode*)parent,
                 },
-                // `insert_into_internal` will insert a key and a value at `edge_idx`.
+                // `insert_into_internal` will insert an item at `edge_idx`.
                 // It will insert new edge at `edge_idx + 1`.
                 // This means that edge at `edge_idx` and edges before it will be untouched.
                 .edge_idx = split.left.node.parent_edge_idx
             };
-            split = parent_edge.insert_into_internal(split.key, split.val, split.right, allocator);
+            split = parent_edge.insert_into_internal(split.item, split.right, allocator);
 
             // If the parent hasn't been split then stop.
             // Otherwise continue.
@@ -367,8 +342,7 @@ fn HandleKV HandleEdge.insert_into_leaf_recursing_up(self, Key key, Val val, Nod
         {
             // Root has been split. Replace the original root by a newly constructed root.
             InternalNode* new_root = allocator::alloc(allocator, InternalNode);
-            new_root.data.keys[0] = split.key;
-            new_root.data.vals[0] = split.val;
+            new_root.data.items[0] = split.item;
             new_root.data.len = 1;
             new_root.edges[0] = split.left.node;
             new_root.edges[1] = split.right.node;
