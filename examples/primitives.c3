@@ -53,9 +53,8 @@ fn void main()
     slot.item.v = -1;
 
     io::printfn("root length %s", btree.root.node.len);
-    for (int i = 0; i < btree.root.node.len; i++)
+    btree.@each(; item_from_tree)
     {
-        io::printfn("key %d %s", i, btree.root.node.items[i].k);
-        io::printfn("val %d %s", i, btree.root.node.items[i].v);
-    }
+        io::printfn("item %s -> %s", item_from_tree.k, item_from_tree.v);
+    };
 }
