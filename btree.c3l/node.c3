@@ -233,7 +233,7 @@ fn SplitResult HandleItem.split_leaf(self, Allocator allocator)
     result.left = self.node_ref;
     result.item = orig_node.items[self.item_idx];
 
-    LeafNode* new_node = allocator::alloc(allocator, LeafNode);  // Right node.
+    LeafNode* new_node = allocator::new(allocator, LeafNode);  // Right node.
     new_node.len = orig_node.len - (ushort)self.item_idx - 1;
     mem_copy_items(new_node, 0, orig_node, (ushort)self.item_idx + 1, new_node.len);
     result.right.node = new_node;
@@ -319,7 +319,7 @@ fn SplitResult HandleItem.split_internal(self, Allocator allocator)
     result.left = self.node_ref;
     result.item = orig_node.data.items[self.item_idx];
 
-    InternalNode* new_node = allocator::alloc(allocator, InternalNode);  // Right node.
+    InternalNode* new_node = allocator::new(allocator, InternalNode);  // Right node.
     new_node.data.len = orig_node.data.len - (ushort)self.item_idx - 1;
     mem_copy_items(&new_node.data, 0, &orig_node.data, (ushort)self.item_idx + 1, new_node.data.len);
     mem_copy_edges(new_node, 0, orig_node, (ushort)self.item_idx + 1, (usz)new_node.data.len + 1);
@@ -402,7 +402,7 @@ fn HandleItem HandleEdge.insert_into_leaf_recursing_up(self, Type item, NodeRef*
         else
         {
             // Root has been split. Replace the original root by a newly constructed root.
-            InternalNode* new_root = allocator::alloc(allocator, InternalNode);
+            InternalNode* new_root = allocator::new(allocator, InternalNode);
             new_root.data.items[0] = split.item;
             new_root.data.len = 1;
             new_root.edges[0] = split.left.node;

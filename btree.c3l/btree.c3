@@ -88,7 +88,7 @@ struct BTree
 fn void BTree.init(&self, Allocator allocator)
 {
     *self = {
-        .root = { .node = allocator::alloc(allocator, LeafNode) },
+        .root = { .node = allocator::new(allocator, LeafNode) },
         .allocator = allocator
     };
 }
