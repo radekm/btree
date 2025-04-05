@@ -1,5 +1,7 @@
 module btree{Type};
 
+import std::io;
+
 struct SearchResult
 {
     bool found;
@@ -183,6 +185,126 @@ macro void BTree.@each(&self; @body(Type* item_from_tree))
             else
             {
                 // We walked the whole tree.
+                return;
+            }
+        }
+    }
+}
+
+fn void? LeafNode.output_dot_node_id(&self, OutStream out) @local
+{
+    if (!self.parent)
+    {
+        io::fprint(out, "root")!;
+    }
+    else
+    {
+        io::fprint(out, "node")!;
+
+        LeafNode* cur = self;
+        while (cur.parent)
+        {
+            // Describes from root in reverse order.
+            io::fprintf(out, "_%d", cur.parent_edge_idx)!;
+            cur = &cur.parent.data;
+        }
+    }
+}
+
+macro void? NodeRef.@output_dot_node(self, OutStream out; @body(Type item_from_tree)) @local
+{
+    usz width = self.height * 30 + 1;  // Higher node --> wider space for edges.
+    self.node.output_dot_node_id(out)!;
+    io::fprint(out, "[label = < <TABLE BORDER=\"1\" CELLBORDER=\"1\" CELLSPACING=\"0\"><TR>")!;
+    io::fprintf(out, "<TD PORT=\"e0\" WIDTH=\"%d\"></TD>", width)!;  // First edge.
+    foreach (i, item : self.node.items[:self.node.len])
+    {
+        io::fprint(out, "<TD>")!;
+        @body(item);
+        io::fprint(out, "</TD>")!;
+        io::fprintf(out, "<TD PORT=\"e%d\" WIDTH=\"%d\"></TD>", i + 1, width)!; // Edge after `i`-th item.
+    }
+    io::fprintn(out, "</TR></TABLE> >];")!;
+}
+
+// `@body` outputs item from tree to `out`.
+macro void? BTree.@to_dot(&self, OutStream out; @body(Type item_from_tree))
+{
+    if (!self.root.node) abort("Node is not initialized");
+    if (self.root.node.len > CAPACITY) abort("Len is bigger than capacity");
+    if (self.root.node.parent) abort("Root must have no parent");
+    if (self.root.node.parent_edge_idx) abort("Root must have no parent edge");
+
+    // Dot header.
+    io::fprintn(out, "digraph g {")!;
+    io::fprintn(out, "node[shape = plaintext];")!;
+
+    // Output root.
+    self.root.@output_dot_node(out; Type item_from_tree)
+    {
+        @body(item_from_tree);
+    }!;
+
+    HandleEdge edge = { .node_ref = self.root };
+    while (true)
+    {
+        // First go down using the current `edge`.
+        if (edge.node_ref.height > 0)
+        {
+            InternalNode* internal_node = (InternalNode*)edge.node_ref.node;
+            usz edge_idx = edge.edge_idx;
+
+            edge = {
+                .node_ref = {
+                    .height = edge.node_ref.height - 1,
+                    .node = internal_node.edges[edge_idx],
+                },
+            };
+
+            if (!edge.node_ref.node) abort("Node is not initialized");
+            if (edge.node_ref.node.len > CAPACITY) abort("Len is bigger than capacity");
+            if (edge.node_ref.node.len < MIN_LEN_AFTER_SPLIT) abort("Underfull node");
+            if (edge.node_ref.node.parent != internal_node) abort("Inconsistent parent");
+            if (edge.node_ref.node.parent_edge_idx != edge_idx) abort("Inconsistent parent_edge_idx");
+
+            // Output node the first time we reach it from its parent.
+            edge.node_ref.@output_dot_node(out; Type item_from_tree)
+            {
+                @body(item_from_tree);
+            }!;
+
+            // Output parent edge which we just used to reached the node.
+            internal_node.data.output_dot_node_id(out)!;  // Parent node.
+            io::fprintf(out, ":e%d -> ", edge_idx)!;
+            edge.node_ref.node.output_dot_node_id(out)!;  // Child node.
+            io::fprintn(out, ";")!;
+        }
+        // If it's not possible to go down then go up until it's possible to go right.
+        // This means that we may not go up at all and instead go right immediately.
+        // If it's not possible to go right at some level then we have walked the whole tree.
+        else
+        {
+            // While it's not possible to go right, go up.
+            while (edge.edge_idx >= edge.node_ref.node.len && edge.node_ref.node.parent)
+            {
+                edge = {
+                    .node_ref = {
+                        .height = edge.node_ref.height + 1,
+                        .node = &edge.node_ref.node.parent.data,
+                    },
+                    .edge_idx = edge.node_ref.node.parent_edge_idx,
+                };
+            }
+
+            if (edge.edge_idx < edge.node_ref.node.len)
+            {
+                // It's possible to go right.
+                edge.edge_idx++;
+            }
+            else
+            {
+                // We walked the whole tree.
+                io::fprintn(out, "}")!;  // Close dot header.
                 return;
             }
         }
