@@ -68,6 +68,62 @@ struct HandleEdge
 }
 
 // ----------------------------------------------------------------------------
+// HELPERS
+// ----------------------------------------------------------------------------
+
+<*
+ @require dest != src : "Aliasing is not allowed"
+ @require dest_idx <= CAPACITY && dest_idx + count <= (ushort)CAPACITY
+ @require src_idx <= CAPACITY && src_idx + count <= (ushort)CAPACITY
+*>
+fn void mem_copy_items(LeafNode* dest, ushort dest_idx, LeafNode* src, ushort src_idx, ushort count)
+{
+    // We do pointer arithmetic because `&dest.items[dest_idx]`
+    // may fail with index out of bounds when `dest_idx == dest.len` and `count == 0`.
+   mem::copy(
+        &dest.items[0] + dest_idx,
+        &src.items[0] + src_idx,
+        count * Type.sizeof);
+}
+
+<*
+ @require dest_idx <= CAPACITY && dest_idx + count <= (ushort)CAPACITY
+ @require src_idx <= CAPACITY && src_idx + count <= (ushort)CAPACITY
+*>
+fn void mem_move_items(LeafNode* dest_and_src, ushort dest_idx, ushort src_idx, ushort count)
+{
+    mem::move(
+        &dest_and_src.items[0] + dest_idx,
+        &dest_and_src.items[0] + src_idx,
+        count * Type.sizeof);
+}
+
+<*
+ @require dest != src : "Aliasing is not allowed"
+ @require dest_idx <= (ushort)(CAPACITY + 1) && dest_idx + count <= (ushort)(CAPACITY + 1)
+ @require src_idx <= (ushort)(CAPACITY + 1) && src_idx + count <= (ushort)(CAPACITY + 1)
+*>
+fn void mem_copy_edges(InternalNode* dest, ushort dest_idx, InternalNode* src, ushort src_idx, usz count)
+{
+    mem::copy(
+        &dest.edges[0] + dest_idx,
+        &src.edges[0] + src_idx,
+        count * (LeafNode*).sizeof);
+}
+
+<*
+ @require dest_idx <= (ushort)(CAPACITY + 1) && dest_idx + count <= (ushort)(CAPACITY + 1)
+ @require src_idx <= (ushort)(CAPACITY + 1) && src_idx + count <= (ushort)(CAPACITY + 1)
+*>
+fn void mem_move_edges(InternalNode* dest_and_src, ushort dest_idx, ushort src_idx, ushort count)
+{
+    mem::move(
+        &dest_and_src.edges[0] + dest_idx,
+        &dest_and_src.edges[0] + src_idx,
+        count * (LeafNode*).sizeof);
+}
+
+// ----------------------------------------------------------------------------
 // INSERTION
 // ----------------------------------------------------------------------------
 
@@ -179,7 +235,7 @@ fn SplitResult HandleItem.split_leaf(self, Allocator allocator)
 
     LeafNode* new_node = allocator::alloc(allocator, LeafNode);  // Right node.
     new_node.len = orig_node.len - (ushort)self.item_idx - 1;
-    mem::copy(&new_node.items, &orig_node.items[self.item_idx + 1], new_node.len * Type.sizeof);
+    mem_copy_items(new_node, 0, orig_node, (ushort)self.item_idx + 1, new_node.len);
     result.right.node = new_node;
 
     orig_node.len = (ushort)self.item_idx;
@@ -219,13 +275,17 @@ fn InsertIntoLeafResult HandleEdge.insert_into_leaf(self, Type item, Allocator a
 }
 
 // `from` and `to_excl` are for edge indices.
-fn void InternalNode.correct_childrens_parent_links(&self, usz from, usz to_excl)
+<*
+ @require from <= to_excl
+ @require to_excl <= CAPACITY + 1
+*>
+fn void InternalNode.correct_childrens_parent_links(&self, ushort from, ushort to_excl)
 {
-    for (usz i = from; i < to_excl; i++)
+    for (ushort i = from; i < to_excl; i++)
     {
         LeafNode* child = self.edges[i];
         child.parent = self;
-        child.parent_edge_idx = (ushort)i;
+        child.parent_edge_idx = i;
     }
 }
 
@@ -248,7 +308,7 @@ fn void HandleEdge.insert_fit_into_internal(self, Type item, NodeRef edge)
     slice_insert_edge(internal_node.edges[:cur_len+1], self.edge_idx + 1, edge.node);
     node.len++;
 
-    internal_node.correct_childrens_parent_links(self.edge_idx + 1, (usz)node.len + 1);
+    internal_node.correct_childrens_parent_links((ushort)self.edge_idx + 1, node.len + 1);
 }
 
 fn SplitResult HandleItem.split_internal(self, Allocator allocator)
@@ -261,8 +321,9 @@ fn SplitResult HandleItem.split_internal(self, Allocator allocator)
 
     InternalNode* new_node = allocator::alloc(allocator, InternalNode);  // Right node.
     new_node.data.len = orig_node.data.len - (ushort)self.item_idx - 1;
-    mem::copy(&new_node.data.items, &orig_node.data.items[self.item_idx + 1], new_node.data.len * Type.sizeof);
-    mem::copy(&new_node.edges, &orig_node.edges[self.item_idx + 1], ((usz)new_node.data.len + 1) * (LeafNode*).sizeof);
+    mem_copy_items(&new_node.data, 0, &orig_node.data, (ushort)self.item_idx + 1, new_node.data.len);
+    mem_copy_edges(new_node, 0, orig_node, (ushort)self.item_idx + 1, (usz)new_node.data.len + 1);
+    new_node.correct_childrens_parent_links(0, new_node.data.len + 1);
     result.right.node = &new_node.data;
     result.right.height = self.node_ref.height;
 
