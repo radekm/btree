@@ -417,3 +417,158 @@ fn HandleItem HandleEdge.insert_into_leaf_recursing_up(self, Type item, NodeRef*
         }
     }
 }
+
+// ----------------------------------------------------------------------------
+// BALANCING UNDERFULL NODES AFTER REMOVAL
+// ----------------------------------------------------------------------------
+
+// Represents a session for evaluating and performing a balancing operation
+// around an internal item.
+struct BalancingContext
+{
+    HandleItem parent;
+    NodeRef left_child;
+    NodeRef right_child;
+
+    // Determines whether we're balancing parent's left or right child.
+    // We prefer balancing contexts where we're balancing right child
+    // (ie. where right child is underfull).
+    //
+    // The reason why we prefer right child to be underfull is speed.
+    // (1) When mergin our implementation always merges right child
+    //     into left child. So if right child is underfull then
+    //     we have to copy less items and less edges.
+    // (2) When stealing from left child we have to shift
+    //     items and edges in underfull right child.
+    //     When stealing from right child we have to shift
+    //     items and edges in right child which is not underfull.
+    //     So in the first case we have to shift less items and edges
+    //     because the node is underfull.
+    bool balancing_left_child;
+}
+
+// Chooses a balancing context involving the node as a child, thus between
+// the item immediately to the left or to the right in the parent node.
+// Fails if `self` has no parent or if the parent is empty.
+//
+// Prefers placing `self` as right child in the returned balancing context.
+<*
+ @require self.node.parent != null
+ @require self.node.parent.data.len > 0
+*>
+fn BalancingContext NodeRef.choose_parent_item(self)
+{
+    InternalNode* parent = self.node.parent;
+
+    // The condition `self.node.parent_edge_idx != 0` is true iff `self` is not the leftmost child.
+    // And so if the condition is true we can create a balancing context where `self` is the right child.
+    if (self.node.parent_edge_idx != 0)
+    {
+        return {
+            .parent = {
+                .node_ref = {
+                    .height = self.height + 1,
+                    .node = &parent.data,
+                },
+                .item_idx = (usz)self.node.parent_edge_idx - 1,
+            },
+            .left_child = {
+                .height = self.height,
+                .node = parent.edges[self.node.parent_edge_idx - 1],
+            },
+            .right_child = self,
+            .balancing_left_child = false,
+        };
+    }
+    else
+    {
+        return {
+            .parent = {
+                .node_ref = {
+                    .height = self.height + 1,
+                    .node = &parent.data,
+                },
+                .item_idx = self.node.parent_edge_idx,
+            },
+            .left_child = self,
+            .right_child = {
+                .height = self.height,
+                .node = parent.edges[self.node.parent_edge_idx + 1],
+            },
+            .balancing_left_child = true,
+        };
+    }
+}
+
+fn bool BalancingContext.can_merge(self)
+{
+    return self.left_child.node.len + 1 + self.right_child.node.len <= CAPACITY;
+}
+
+// Merges the parent's item and both adjacent child nodes into
+// the left child node and frees the right child node.
+<*
+ @require self.left_child.node.len + 1 + self.right_child.node.len <= CAPACITY : "Cannot merge because node capacity would be exceeded"
+*>
+fn void BalancingContext.do_merge(self, Allocator allocator)
+{
+    InternalNode* parent = (InternalNode*)self.parent.node_ref.node;
+    LeafNode* left_child = self.left_child.node;
+    LeafNode* right_child = self.right_child.node;
+
+    // Move items to left child.
+
+    left_child.items[left_child.len] = parent.data.items[self.parent.item_idx];
+    mem_copy_items(
+        left_child, left_child.len + 1,
+        right_child, 0,
+        right_child.len);
+
+    // Remove item from parent.
+    ushort num_of_items_to_move = parent.data.len - (ushort)self.parent.item_idx - 1;
+    mem_move_items(
+        &parent.data,
+        // `self.parent.item_idx` is left edge before the item which has been moved from parent.
+        // This edge should be preserved but the item immediatelly after it was moved.
+        (ushort)self.parent.item_idx,
+        (ushort)self.parent.item_idx + 1,
+        num_of_items_to_move);
+
+    // Remove edge leading to right child from parent
+
+    // `parent.data.len + 1` is the original number of edges before removal.
+    ushort num_of_remaining_edges = parent.data.len;
+    // The number edges which don't need to move (left edge and all edges on its left side).
+    ushort num_of_edges_to_stay = (ushort)self.parent.item_idx + 1;
+    ushort num_of_edges_to_move = num_of_remaining_edges - num_of_edges_to_stay;
+    mem_move_edges(
+        parent,
+        // `self.parent.item_idx` is left edge before the item which has been moved from parent.
+        // This edge should be preserved.
+        // `self.parent.item_idx + 1` is right edge which should be removed.
+        (ushort)self.parent.item_idx + 1,
+        (ushort)self.parent.item_idx + 2,
+        num_of_edges_to_move);
+    parent.correct_childrens_parent_links(num_of_edges_to_stay, num_of_remaining_edges);
+
+    // If children are not leaves then copy edges from right child to left child.
+    if (self.left_child.height > 0)
+    {
+        InternalNode* left = (InternalNode*)left_child;
+        InternalNode* right = (InternalNode*)right_child;
+        mem_copy_edges(
+            left, left_child.len + 1,
+            right, 0,
+            (usz)right_child.len + 1);
+        left.correct_childrens_parent_links(
+            (usz)left_child.len + 1,
+            (usz)left_child.len + 1 + (usz)right_child.len + 1);
+    }
+
+    // Fix lengths.
+    parent.data.len--;
+    left_child.len += 1 + right_child.len;
+
+    // Deallocate right node.
+    allocator::free(allocator, right_child);
+}
