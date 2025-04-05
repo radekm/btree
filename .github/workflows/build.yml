@@ -29,6 +29,8 @@ jobs:
           ./build.sh
 
           ls -l build
+
+          time ./test.sh
   build-and-test-in-cmd:
     strategy:
       matrix:
