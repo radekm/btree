@@ -5,7 +5,9 @@ are more complex in Rust than rules in C or C3.
 Code in C and C3 is usually shorter than code in Rust.
 This is especially true for code in unsafe Rust.
 
-`rust/node.rs` is a copy of Rust's `library/alloc/src/collections/btree/node.rs`
+`rust/node.rs` and `rust/remove.rs` are a copy of Rust's
+`library/alloc/src/collections/btree/node.rs`
+and `library/alloc/src/collections/btree/remove.rs`
 from commit 810e4c1bc62a4801a4c29fe6c975630acbd78370.
 `btree.c3l/node.c3` is a code translated to C3.
 Comments were mostly preserved if they made sense in C3.
