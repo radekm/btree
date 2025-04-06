@@ -572,3 +572,83 @@ fn void BalancingContext.do_merge(self, Allocator allocator)
     // Deallocate right node.
     allocator::free(allocator, right_child);
 }
+
+<*
+ @require count > 0 : "Stealing no items doesn't make sense"
+ @require self.left_child.node.len >= count : "Not enough items to steal"
+ @require self.right_child.node.len + count <= (ushort)CAPACITY : "Cannot steal because node capacity would be exceeded"
+*>
+fn void BalancingContext.bulk_steal_left(self, ushort count)
+{
+    LeafNode* parent = self.parent.node_ref.node;
+    LeafNode* left_child = self.left_child.node;
+    LeafNode* right_child = self.right_child.node;
+
+    // Make room for stolen items.
+    mem_move_items(right_child, count, 0, right_child.len);
+    // Move item from parent to right child.
+    right_child.items[count - 1] = parent.items[self.parent.item_idx];
+    // Move items from left child to right child.
+    mem_copy_items(right_child, 0, left_child, left_child.len - (count - 1), count - 1);
+    // Move item from left child to parent.
+    parent.items[self.parent.item_idx] = left_child.items[left_child.len - count];
+
+    // If children are not leaves then move edges from left child to right child.
+    if (self.left_child.height > 0)
+    {
+        InternalNode* left = (InternalNode*)left_child;
+        InternalNode* right = (InternalNode*)right_child;
+
+        // Make room for stolen edges.
+        mem_move_edges(right, count, 0, right_child.len + 1);
+        // Move edges.
+        mem_copy_edges(right, 0, left, left_child.len + 1 - count, count);
+
+        // We have to correct parent links from all children
+        // (existing children were shifted so their `parent_edge_idx` changed).
+        right.correct_childrens_parent_links(0, right_child.len + 1 + count);
+    }
+
+    left_child.len -= count;
+    right_child.len += count;
+}
+
+<*
+ @require count > 0 : "Stealing no items doesn't make sense"
+ @require self.left_child.node.len + count <= (ushort)CAPACITY : "Cannot steal because node capacity would be exceeded"
+ @require self.right_child.node.len >= count : "Not enough items to steal"
+*>
+fn void BalancingContext.bulk_steal_right(self, ushort count)
+{
+    LeafNode* parent = self.parent.node_ref.node;
+    LeafNode* left_child = self.left_child.node;
+    LeafNode* right_child = self.right_child.node;
+
+    // Move item from parent to left child.
+    left_child.items[left_child.len] = parent.items[self.parent.item_idx];
+    // Move items from right child to left child.
+    mem_copy_items(left_child, left_child.len + 1, right_child, 0, count - 1);
+    // Move item from right child to parent.
+    parent.items[self.parent.item_idx] = right_child.items[count - 1];
+    // Shift remaining items in right child.
+    mem_move_items(right_child, 0, count, right_child.len - count);
+
+    // If children are not leaves then move edges from right child to left child.
+    if (self.left_child.height > 0)
+    {
+        InternalNode* left = (InternalNode*)left_child;
+        InternalNode* right = (InternalNode*)right_child;
+
+        // Move edges.
+        mem_copy_edges(left, left_child.len + 1, right, 0, count);
+        // Shift remaining edges in right child.
+        mem_move_edges(right, 0, count, right_child.len + 1 - count);
+
+        // We have to correct parent links.
+        left.correct_childrens_parent_links(left_child.len + 1, left_child.len + 1 + count);
+        right.correct_childrens_parent_links(0, right_child.len + 1 - count);
+    }
+
+    left_child.len += count;
+    right_child.len -= count;
+}
