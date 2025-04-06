@@ -1,3 +1,5 @@
+## Notes on translation from Rust to C3
+
 Rewrite of Rust's B-tree implementation to C3 for better clarity and safety.
 Reviewing unsafe code in Rust is harder because rules (especially aliasing rules)
 are more complex in Rust than rules in C or C3.
@@ -9,7 +11,7 @@ This is especially true for code in unsafe Rust.
 `library/alloc/src/collections/btree/node.rs`
 and `library/alloc/src/collections/btree/remove.rs`
 from commit 810e4c1bc62a4801a4c29fe6c975630acbd78370.
-`btree.c3l/node.c3` is a code translated to C3.
+`btree.c3l/node.c3` is `node.rs` translated to C3.
 Comments were mostly preserved if they made sense in C3.
 Code which made no sense in C3 was ignored. That was mostly
 
