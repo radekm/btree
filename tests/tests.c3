@@ -20,17 +20,12 @@ fn void? Trash.write_byte(&self, char c) @dynamic
 {
 }
 
-fn void BTree{uint}.check_invariants(&self, usz expected_number_of_items)
+fn void BTree{uint}.check_invariants_and_orderding(&self, usz expected_number_of_items)
 {
     // Check invariants.
     assert(self.number_of_items == expected_number_of_items);
 
-    // `@to_dot` also check invariants.
-    // Unfortunately it's very slow.
-    Trash trash;
-    self.@to_dot(&trash; uint item_from_tree)
-    {
-    }!!;
+    self.check_invariants();
 
     // Check that items have correct order and their actual count.
     int actual_count;
@@ -83,7 +78,7 @@ fn void parametric_test(usz number_of_items_to_insert, usz min_expected_height)
         io::printfn("Generated %d, inserted %d", generated, inserted);
 
         assert(btree.root.height >= min_expected_height);
-        btree.check_invariants(inserted);
+        btree.check_invariants_and_orderding(inserted);
 
         // Check that all numbers are in tree.
         Sfc64Random r2;
@@ -120,14 +115,14 @@ fn void parametric_test(usz number_of_items_to_insert, usz min_expected_height)
             // Several times during deletition check tree invariants.
             if (generated / 100 > 0 && i % (generated / 100) == 0)
             {
-                btree.check_invariants(inserted - deleted);
+                btree.check_invariants_and_orderding(inserted - deleted);
             }
         }
 
         // Check empty tree.
         assert(deleted == inserted);
         assert(btree.root.height == 0);
-        btree.check_invariants(0);
+        btree.check_invariants_and_orderding(0);
     };
 }
 

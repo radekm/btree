@@ -330,6 +330,68 @@ macro void? BTree.@to_dot(&self, OutStream out; @body(Type item_from_tree))
     }
 }
 
+// Checks same invariants as `@to_dot` but it's faster since it doesn't generate any output.
+// Ordering isn't checked.
+fn void BTree.check_invariants(&self)
+{
+    if (!self.root.node) abort("Node is not initialized");
+    if (self.root.node.len > CAPACITY) abort("Len is bigger than capacity");
+    if (self.root.node.parent) abort("Root must have no parent");
+    if (self.root.node.parent_edge_idx) abort("Root must have no parent edge");
+
+    HandleEdge edge = { .node_ref = self.root };
+    while (true)
+    {
+        // First go down using the current `edge`.
+        if (edge.node_ref.height > 0)
+        {
+            InternalNode* internal_node = (InternalNode*)edge.node_ref.node;
+            usz edge_idx = edge.edge_idx;
+
+            edge = {
+                .node_ref = {
+                    .height = edge.node_ref.height - 1,
+                    .node = internal_node.edges[edge_idx],
+                },
+            };
+
+            if (!edge.node_ref.node) abort("Node is not initialized");
+            if (edge.node_ref.node.len > CAPACITY) abort("Len is bigger than capacity");
+            if (edge.node_ref.node.len < MIN_LEN_AFTER_SPLIT) abort("Underfull node");
+            if (edge.node_ref.node.parent != internal_node) abort("Inconsistent parent");
+            if (edge.node_ref.node.parent_edge_idx != edge_idx) abort("Inconsistent parent_edge_idx");
+        }
+        // If it's not possible to go down then go up until it's possible to go right.
+        // This means that we may not go up at all and instead go right immediately.
+        // If it's not possible to go right at some level then we have walked the whole tree.
+        else
+        {
+            // While it's not possible to go right, go up.
+            while (edge.edge_idx >= edge.node_ref.node.len && edge.node_ref.node.parent)
+            {
+                edge = {
+                    .node_ref = {
+                        .height = edge.node_ref.height + 1,
+                        .node = &edge.node_ref.node.parent.data,
+                    },
+                    .edge_idx = edge.node_ref.node.parent_edge_idx,
+                };
+            }
+
+            if (edge.edge_idx < edge.node_ref.node.len)
+            {
+                // It's possible to go right.
+                edge.edge_idx++;
+            }
+            else
+            {
+                // We walked the whole tree.
+                return;
+            }
+        }
+    }
+}
+
 // TODO:
 // macro void Map.@remove_if(&self, ???)
 // It could be same as @get_existing_slots but @body can return whether to remove or not.
