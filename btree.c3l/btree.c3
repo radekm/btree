@@ -140,6 +140,25 @@ macro BTreeSlot BTree.@get_slot(&self; @body(Type item_from_tree, int* x))
     return { .existed = sr.found, .item = &node.items[handle.item_idx] };
 }
 
+macro bool BTree.@remove(&self; @body(Type item_from_tree, int* x))
+{
+    SearchResult sr = self.root.@search_tree(; Type item_from_tree, int* x)
+    {
+        @body(item_from_tree, x);
+    };
+
+    if (!sr.found)
+    {
+        return false;
+    }
+    else
+    {
+        sr.existing_item.remove_item(&self.root, self.allocator);
+        self.number_of_items--;
+        return true;
+    }
+}
+
 // TODO: Create a generalized `@each` which walks the tree from the given `HandleEdge`.
 //       It would be nice to start walking through the tree at some `HandleEdge`
 //       stop somewhere else (not necessarily at the end) and later resume walking where we stopped.

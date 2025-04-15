@@ -20,7 +20,34 @@ fn void? Trash.write_byte(&self, char c) @dynamic
 {
 }
 
-fn void parametric_insertion_test(usz number_of_items_to_insert, usz min_expected_height)
+fn void BTree{uint}.check_invariants(&self, usz expected_number_of_items)
+{
+    // Check invariants.
+    assert(self.number_of_items == expected_number_of_items);
+
+    // `@to_dot` also check invariants.
+    // Unfortunately it's very slow.
+    Trash trash;
+    self.@to_dot(&trash; uint item_from_tree)
+    {
+    }!!;
+
+    // Check that items have correct order and their actual count.
+    int actual_count;
+    uint prev;
+    self.@each(; uint* item_from_tree)
+    {
+        if (actual_count)
+        {
+            assert(prev < *item_from_tree);
+        }
+        actual_count++;
+        prev = *item_from_tree;
+    };
+    assert(actual_count == expected_number_of_items);
+}
+
+fn void parametric_test(usz number_of_items_to_insert, usz min_expected_height)
 {
     // TODO: Currently `BTree` doesn't have `free` so we use temp allocator.
     @pool()
@@ -55,29 +82,8 @@ fn void parametric_insertion_test(usz number_of_items_to_insert, usz min_expecte
 
         io::printfn("Generated %d, inserted %d", generated, inserted);
 
-        // Check invariants.
-        assert(btree.number_of_items == inserted);
         assert(btree.root.height >= min_expected_height);
-
-        // `@to_dot` also check invariants.
-        Trash trash;
-        btree.@to_dot(&trash; uint item_from_tree)
-        {
-        }!!;
-
-        // Check that items have correct order and their actual count.
-        int actual_count;
-        uint prev;
-        btree.@each(; uint* item_from_tree)
-        {
-            if (actual_count)
-            {
-                assert(prev < *item_from_tree);
-            }
-            actual_count++;
-            prev = *item_from_tree;
-        };
-        assert(actual_count == inserted);
+        btree.check_invariants(inserted);
 
         // Check that all numbers are in tree.
         Sfc64Random r2;
@@ -95,30 +101,68 @@ fn void parametric_insertion_test(usz number_of_items_to_insert, usz min_expecte
             assert(slot.existed);
             assert(*slot.item == number);
         }
+
+        // Delete numbers.
+        Sfc64Random r3;
+        r3.set_seed(&entropy);
+        usz deleted;
+
+        for (int i; i < generated; i++)
+        {
+            uint number = r3.next_int();
+
+            bool removed = btree.@remove(; item_from_tree, int* x)
+            {
+                *x = compare_uints(number, item_from_tree);
+            };
+            deleted += (usz)removed;
+
+            // Several times during deletition check tree invariants.
+            if (generated / 100 > 0 && i % (generated / 100) == 0)
+            {
+                btree.check_invariants(inserted - deleted);
+            }
+        }
+
+        // Check empty tree.
+        assert(deleted == inserted);
+        assert(btree.root.height == 0);
+        btree.check_invariants(0);
     };
 }
 
-fn void test_insertion_big() @test
+fn void test_small() @test
 {
-    // We want to create tree with at least 7 levels.
-    // 35831807 (= 12^0 * 11 + 12^1 * 11 + 12^2 * 11 + 12^3 * 11 + 12^4 * 11 + 12^5 * 11 + 12^6 * 11)
-    // items can fit into tree with 6 levels. Having one more item guarantees at least 7 levels.
-    for (int i; i < 10; i++)
+    // We want to create tree with at least 5 levels (height 4).
+    // 20735 (= 12^0 * 11 + 12^1 * 11 + 12^2 * 11 + 12^3 * 11)
+    // items can fit into tree with 4 levels. Having one more item guarantees at least 5 levels.
+    for (int i; i < 100; i++)
     {
-        parametric_insertion_test(35_831_808, 7);
+        parametric_test(20736, 4);
     }
 }
 
-fn void test_insertion_bigger() @test
+fn void test_big() @test
 {
-    parametric_insertion_test(90_000_000, 7);
+    // We want to create tree with at least 8 levels (height 7).
+    // 35831807 (= 12^0 * 11 + 12^1 * 11 + 12^2 * 11 + 12^3 * 11 + 12^4 * 11 + 12^5 * 11 + 12^6 * 11)
+    // items can fit into tree with 7 levels. Having one more item guarantees at least 8 levels.
+    for (int i; i < 4; i++)
+    {
+        parametric_test(35_831_808, 7);
+    }
+}
+
+fn void test_bigger() @test
+{
+    parametric_test(90_000_000, 7);
 }
 
 // Needs 6 GB of memory.
-// fn void test_insertion_huge() @test
+// fn void test_huge() @test
 // {
 //     // We want to create tree with at least 8 levels.
 //     // 429981695 (= 12^0 * 11 + 12^1 * 11 + 12^2 * 11 + 12^3 * 11 + 12^4 * 11 + 12^5 * 11 + 12^6 * 11 + 12^7 * 11)
 //     // items can fit into tree with 7 levels. Having one more item guarantees at least 8 levels.
-//     parametric_insertion_test(429_981_696, 8);
+//     parametric_test(429_981_696, 8);
 // }

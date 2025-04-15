@@ -435,7 +435,7 @@ struct BalancingContext
     // (ie. where right child is underfull).
     //
     // The reason why we prefer right child to be underfull is speed.
-    // (1) When mergin our implementation always merges right child
+    // (1) When merging our implementation always merges right child
     //     into left child. So if right child is underfull then
     //     we have to copy less items and less edges.
     // (2) When stealing from left child we have to shift
