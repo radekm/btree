@@ -89,7 +89,7 @@ fn void BTree.init(&self, Allocator allocator)
 {
     *self = {
         .root = { .node = allocator::new(allocator, LeafNode) },
-        .allocator = allocator
+        .allocator = allocator,
     };
 }
 
@@ -156,6 +156,59 @@ macro bool BTree.@remove(&self; @body(Type item_from_tree, int* x))
         sr.existing_item.remove_item(&self.root, self.allocator);
         self.number_of_items--;
         return true;
+    }
+}
+
+fn void BTree.free(&self)
+{
+    if (!self.root.node && !self.root.height && !self.allocator && !self.number_of_items) return;
+
+    HandleEdge edge = { .node_ref = self.root };
+    while (true)
+    {
+        // First go down using the current `edge`.
+        if (edge.node_ref.height > 0)
+        {
+            InternalNode* internal_node = (InternalNode*)edge.node_ref.node;
+            edge = {
+                .node_ref = {
+                    .height = edge.node_ref.height - 1,
+                    .node = internal_node.edges[edge.edge_idx],
+                },
+            };
+        }
+        // If it's not possible to go down then go up until it's possible to go right.
+        // This means that we may not go up at all and instead go right immediately.
+        // If it's not possible to go right at any level then we have walked the whole tree.
+        else
+        {
+            // While it's not possible to go right, go up and free the node we are leaving.
+            while (edge.edge_idx >= edge.node_ref.node.len && edge.node_ref.node.parent)
+            {
+                LeafNode* node_to_free = edge.node_ref.node;
+                edge = {
+                    .node_ref = {
+                        .height = edge.node_ref.height + 1,
+                        .node = &node_to_free.parent.data,
+                    },
+                    .edge_idx = node_to_free.parent_edge_idx,
+                };
+                allocator::free(self.allocator, node_to_free);
+            }
+
+            if (edge.edge_idx < edge.node_ref.node.len)
+            {
+                // It's possible to go right.
+                edge.edge_idx++;
+            }
+            else
+            {
+                // We walked the whole tree, we can free the root.
+                allocator::free(self.allocator, self.root.node);
+                *self = {};  // Zero everything.
+                return;
+            }
+        }
     }
 }
 
@@ -395,6 +448,3 @@ fn void BTree.check_invariants(&self)
 // TODO:
 // macro void Map.@remove_if(&self, ???)
 // It could be same as @get_existing_slots but @body can return whether to remove or not.
-
-// TODO:
-// Add a function to free BTree.

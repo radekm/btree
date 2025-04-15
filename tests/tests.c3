@@ -45,85 +45,83 @@ fn void BTree{uint}.check_invariants_and_orderding(&self, usz expected_number_of
 fn void parametric_test(usz number_of_items_to_insert, usz min_expected_height)
 {
     // TODO: Currently `BTree` doesn't have `free` so we use temp allocator.
-    @pool()
+    BTree{uint} btree;
+    btree.init(mem);
+    defer btree.free();
+
+    char[8 * 4] entropy = random::entropy();
+    Sfc64Random r;
+    r.set_seed(&entropy);
+    usz generated;
+    usz inserted;
+
+    while (inserted < number_of_items_to_insert)
     {
-        BTree{uint} btree;
-        btree.init(tmem);
+        uint new = r.next_int();
+        generated++;
 
-        char[8 * 4] entropy = random::entropy();
-        Sfc64Random r;
-        r.set_seed(&entropy);
-        usz generated;
-        usz inserted;
-
-        while (inserted < number_of_items_to_insert)
+        BTreeSlot{uint} slot;
+        slot = btree.@get_slot(; item_from_tree, int* x)
         {
-            uint new = r.next_int();
-            generated++;
+            *x = compare_uints(new, item_from_tree);
+        };
 
-            BTreeSlot{uint} slot;
-            slot = btree.@get_slot(; item_from_tree, int* x)
-            {
-                *x = compare_uints(new, item_from_tree);
-            };
-
-            // Only insert if the number wans't there before.
-            if (!slot.existed)
-            {
-                *slot.item = new;
-                inserted++;
-            }
-        }
-
-        io::printfn("Generated %d, inserted %d", generated, inserted);
-
-        assert(btree.root.height >= min_expected_height);
-        btree.check_invariants_and_orderding(inserted);
-
-        // Check that all numbers are in tree.
-        Sfc64Random r2;
-        r2.set_seed(&entropy);
-        for (int i; i < generated; i++)
+        // Only insert if the number wans't there before.
+        if (!slot.existed)
         {
-            uint number = r2.next_int();
-
-            BTreeSlot{uint} slot;
-            slot = btree.@get_existing_slot(; item_from_tree, int* x)
-            {
-                *x = compare_uints(number, item_from_tree);
-            };
-
-            assert(slot.existed);
-            assert(*slot.item == number);
+            *slot.item = new;
+            inserted++;
         }
+    }
 
-        // Delete numbers.
-        Sfc64Random r3;
-        r3.set_seed(&entropy);
-        usz deleted;
+    io::printfn("Generated %d, inserted %d", generated, inserted);
 
-        for (int i; i < generated; i++)
+    assert(btree.root.height >= min_expected_height);
+    btree.check_invariants_and_orderding(inserted);
+
+    // Check that all numbers are in tree.
+    Sfc64Random r2;
+    r2.set_seed(&entropy);
+    for (int i; i < generated; i++)
+    {
+        uint number = r2.next_int();
+
+        BTreeSlot{uint} slot;
+        slot = btree.@get_existing_slot(; item_from_tree, int* x)
         {
-            uint number = r3.next_int();
+            *x = compare_uints(number, item_from_tree);
+        };
 
-            bool removed = btree.@remove(; item_from_tree, int* x)
-            {
-                *x = compare_uints(number, item_from_tree);
-            };
-            deleted += (usz)removed;
+        assert(slot.existed);
+        assert(*slot.item == number);
+    }
 
-            // Several times during deletition check tree invariants.
-            if (generated / 100 > 0 && i % (generated / 100) == 0)
-            {
-                btree.check_invariants_and_orderding(inserted - deleted);
-            }
+    // Delete numbers.
+    Sfc64Random r3;
+    r3.set_seed(&entropy);
+    usz deleted;
+
+    for (int i; i < generated; i++)
+    {
+        uint number = r3.next_int();
+
+        bool removed = btree.@remove(; item_from_tree, int* x)
+        {
+            *x = compare_uints(number, item_from_tree);
+        };
+        deleted += (usz)removed;
+
+        // Several times during deletition check tree invariants.
+        if (generated / 100 > 0 && i % (generated / 100) == 0)
+        {
+            btree.check_invariants_and_orderding(inserted - deleted);
         }
+    }
 
-        // Check empty tree.
-        assert(deleted == inserted);
-        assert(btree.root.height == 0);
-        btree.check_invariants_and_orderding(0);
-    };
+    // Check empty tree.
+    assert(deleted == inserted);
+    assert(btree.root.height == 0);
+    btree.check_invariants_and_orderding(0);
 }
 
 fn void test_small() @test
