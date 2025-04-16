@@ -154,8 +154,8 @@ fn void test_bigger() @test
 // Needs 6 GB of memory.
 // fn void test_huge() @test
 // {
-//     // We want to create tree with at least 8 levels.
+//     // We want to create tree with at least 9 levels (height 8).
 //     // 429981695 (= 12^0 * 11 + 12^1 * 11 + 12^2 * 11 + 12^3 * 11 + 12^4 * 11 + 12^5 * 11 + 12^6 * 11 + 12^7 * 11)
-//     // items can fit into tree with 7 levels. Having one more item guarantees at least 8 levels.
+//     // items can fit into tree with 8 levels. Having one more item guarantees at least 9 levels.
 //     parametric_test(429_981_696, 8);
 // }

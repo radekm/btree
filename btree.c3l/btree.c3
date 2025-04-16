@@ -1,5 +1,6 @@
 module btree{Type};
 
+import std::collections::maybe;
 import std::io;
 
 struct SearchResult
@@ -443,6 +444,23 @@ fn void BTree.check_invariants(&self)
             }
         }
     }
+}
+
+fn Maybe{Type} BTree.first_item(&self)
+{
+    if (!self.number_of_items) return {};
+
+    NodeRef node_ref = self.root;
+    while (node_ref.height > 0)
+    {
+        InternalNode* internal_node = (InternalNode*)node_ref.node;
+        // Use the leftmost edge to go down.
+        node_ref = {
+            .height = node_ref.height - 1,
+            .node = internal_node.edges[0],
+        };
+    }
+    return maybe::value{Type}(node_ref.node.items[0]);
 }
 
 // TODO:
