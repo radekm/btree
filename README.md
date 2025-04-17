@@ -25,6 +25,12 @@ The `orders_by_id` index organizes these orders by `order_id`.
 The `bid_by_priority` and `ask_by_priority` indices are partial - they include
 only bid or ask orders, respectively - and organize them by `price`, `entry_time_us`, and `order_id`.
 
+## Performance
+
+The code in `node.c3` was translated from Rust,
+but our B-tree is approximately 10% slower than the Rust version for an unknown reason.
+Memory usage is the same.
+
 ## Contributions
 
 We accept:
