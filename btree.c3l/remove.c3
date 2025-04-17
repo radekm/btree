@@ -4,7 +4,7 @@ fn void HandleItem.remove_leaf_item(self, NodeRef* orig_root, Allocator allocato
 {
     {
         LeafNode* node = self.node_ref.node;
-        mem_move_items(node, (ushort)self.item_idx, (ushort)self.item_idx + 1, node.len - (ushort)self.item_idx - 1);
+        mem_move_items(node, self.item_idx, self.item_idx + 1, node.len - self.item_idx - 1);
         node.len--;
 
         // No need to rebalance.
