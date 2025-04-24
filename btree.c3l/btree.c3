@@ -13,14 +13,24 @@ struct SearchResult
     }
 }
 
-// Trailing body is a comparison code.
-// It shall return `x < 0` if we search for something smaller than `item_from_tree` given to it.
-// It shall return `x > 0` if we search for something bigger than `item_from_tree` given to it.
-// Otherwise `item` given to it is what we search for `@body` should return `x == 0`.
+// `#compare` is a comparison function and `...` are arguments which are given to it first.
+// Its last argument is an item from the tree.
+// It returns value lower than zero if we search for something smaller than the item from the tree.
+// It returns value higher than zero if we search for something bigger than the item from the tree.
+// Otherwise the item from the tree is what we search for and `#comparison` returns zero.
 //
-// NOTE: It seems that `@body` can't return a value to circumvent this we added
-//       `x` to which `@body` assigns the result.
-macro SearchResult NodeRef.@search_tree(self; @body(Type item_from_tree, int* x))
+// The most common usage is that `...` contains context needed for comparison
+// and key we search for. In that case `#compare` is called as `#compare(ctx1, ctx2, ctx3, key, item_from_tree)`
+// and `@search_tree` is called as
+//
+//     ```
+//     node_ref.@search_tree(
+//         fn int(Ctx1 ctx1, Ctx2 ctx2, Ctx3 ctx3, Key key, Type item_from_tree) {
+//             // Code for comparison is here.
+//         },
+//         ctx1, ctx2, ctx3, key);
+//     ```
+macro SearchResult NodeRef.@search_tree(self, #compare, ...)
 {
     NodeRef root = self;
 
@@ -31,8 +41,7 @@ macro SearchResult NodeRef.@search_tree(self; @body(Type item_from_tree, int* x)
         int edge;
         for (; edge < node.len; edge++)
         {
-            int x;
-            @body(node.items[edge], &x);
+            int x = #compare($vasplat, node.items[edge]);
             if (x < 0)
             {
                 // We search for something smaller than `node.items[edge]`.
@@ -101,12 +110,9 @@ struct BTreeSlot
 }
 
 // CONSIDER: Return `Type*?` instead?
-macro BTreeSlot BTree.@get_existing_slot(&self; @body(Type item_from_tree, int* x))
+macro BTreeSlot BTree.@get_existing_slot(&self, #compare, ...)
 {
-    SearchResult sr = self.root.@search_tree(; Type item_from_tree, int* x)
-    {
-        @body(item_from_tree, x);
-    };
+    SearchResult sr = self.root.@search_tree(#compare, $vasplat);
 
     if (!sr.found)
     {
@@ -119,12 +125,9 @@ macro BTreeSlot BTree.@get_existing_slot(&self; @body(Type item_from_tree, int* 
     }
 }
 
-macro BTreeSlot BTree.@get_slot(&self; @body(Type item_from_tree, int* x))
+macro BTreeSlot BTree.@get_slot(&self, #compare, ...)
 {
-    SearchResult sr = self.root.@search_tree(; Type item_from_tree, int* x)
-    {
-        @body(item_from_tree, x);
-    };
+    SearchResult sr = self.root.@search_tree(#compare, $vasplat);
 
     HandleItem handle;
     if (sr.found)
@@ -141,12 +144,9 @@ macro BTreeSlot BTree.@get_slot(&self; @body(Type item_from_tree, int* x))
     return { .existed = sr.found, .item = &node.items[handle.item_idx] };
 }
 
-macro bool BTree.@remove(&self; @body(Type item_from_tree, int* x))
+macro bool BTree.@remove(&self, #compare, ...)
 {
-    SearchResult sr = self.root.@search_tree(; Type item_from_tree, int* x)
-    {
-        @body(item_from_tree, x);
-    };
+    SearchResult sr = self.root.@search_tree(#compare, $vasplat);
 
     if (!sr.found)
     {
@@ -284,7 +284,7 @@ fn void? LeafNode.output_dot_node_id(&self, OutStream out) @local
     }
 }
 
-macro void? NodeRef.@output_dot_node(self, OutStream out; @body(Type item_from_tree)) @local
+macro void? NodeRef.@output_dot_node(self, #output_item, OutStream out, ...) @local
 {
     usz width = self.height * 30 + 1;  // Higher node --> wider space for edges.
     self.node.output_dot_node_id(out)!;
@@ -293,7 +293,7 @@ macro void? NodeRef.@output_dot_node(self, OutStream out; @body(Type item_from_t
     foreach (i, item : self.node.items[:self.node.len])
     {
         io::fprint(out, "<TD>")!;
-        @body(item);
+        #output_item(out, $vasplat, item)!;
         io::fprint(out, "</TD>")!;
         io::fprintf(out, "<TD PORT=\"e%d\" WIDTH=\"%d\"></TD>", i + 1, width)!; // Edge after `i`-th item.
     }
@@ -301,7 +301,7 @@ macro void? NodeRef.@output_dot_node(self, OutStream out; @body(Type item_from_t
 }
 
 // `@body` outputs item from tree to `out`.
-macro void? BTree.@to_dot(&self, OutStream out; @body(Type item_from_tree))
+macro void? BTree.@to_dot(&self, #output_item, OutStream out, ...)
 {
     if (!self.root.node) abort("Node is not initialized");
     if (self.root.node.len > CAPACITY) abort("Len is bigger than capacity");
@@ -313,10 +313,7 @@ macro void? BTree.@to_dot(&self, OutStream out; @body(Type item_from_tree))
     io::fprintn(out, "node[shape = plaintext];")!;
 
     // Output root.
-    self.root.@output_dot_node(out; Type item_from_tree)
-    {
-        @body(item_from_tree);
-    }!;
+    self.root.@output_dot_node(#output_item, out, $vasplat)!;
 
     HandleEdge edge = { .node_ref = self.root };
     while (true)
@@ -341,10 +338,7 @@ macro void? BTree.@to_dot(&self, OutStream out; @body(Type item_from_tree))
             if (edge.node_ref.node.parent_edge_idx != edge_idx) abort("Inconsistent parent_edge_idx");
 
             // Output node the first time we reach it from its parent.
-            edge.node_ref.@output_dot_node(out; Type item_from_tree)
-            {
-                @body(item_from_tree);
-            }!;
+            edge.node_ref.@output_dot_node(#output_item, out, $vasplat)!;
 
             // Output parent edge which we just used to reached the node.
             internal_node.data.output_dot_node_id(out)!;  // Parent node.

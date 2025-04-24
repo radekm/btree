@@ -18,10 +18,7 @@ fn void main()
     {
         int elem = i * 10;
         BTreeSlot{int} slot;
-        slot = btree.@get_slot(; item_from_tree, int* x)
-        {
-            *x = compare_ints(elem, item_from_tree);
-        };
+        slot = btree.@get_slot(compare_ints, elem);
         *slot.item = elem;
     }
     // Insert items between existing items.
@@ -29,15 +26,11 @@ fn void main()
     {
         int elem = i;
         BTreeSlot{int} slot;
-        slot = btree.@get_slot(; item_from_tree, int* x)
-        {
-            *x = compare_ints(elem, item_from_tree);
-        };
+        slot = btree.@get_slot(compare_ints, elem);
         *slot.item = elem;
     }
 
-    btree.@to_dot(io::stdout(); item_from_tree)
-    {
-        io::printf("%d", item_from_tree)!!;
-    }!!;
+    btree.@to_dot(
+        fn void?(OutStream out, int item_from_tree) { io::fprintf(out, "%d", item_from_tree)!; },
+        io::stdout())!!;
 }

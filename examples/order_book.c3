@@ -149,19 +149,21 @@ fn void OrderBook.add_order_to_by_priority_index(&self, OrderHandle handle) @loc
     BTreeSlot{OrderHandle} slot;
     if (order.side == BID)
     {
-        slot = self.bid_by_priority.@get_slot(; OrderHandle item_from_tree, int* x)
-        {
-            Order* cur_order = self.orders.get_ref(item_from_tree);
-            *x = compare_bid_by_priority(order, cur_order);
-        };
+        slot = self.bid_by_priority.@get_slot(
+            fn int(Pool{Order}* orders, Order* order, OrderHandle item_from_tree) {
+                Order* cur_order = orders.get_ref(item_from_tree);
+                return compare_bid_by_priority(order, cur_order);
+            },
+            &self.orders, order);
     }
     else
     {
-        slot = self.ask_by_priority.@get_slot(; OrderHandle item_from_tree, int* x)
-        {
-            Order* cur_order = self.orders.get_ref(item_from_tree);
-            *x = compare_ask_by_priority(order, cur_order);
-        };
+        slot = self.ask_by_priority.@get_slot(
+            fn int(Pool{Order}* orders, Order* order, OrderHandle item_from_tree) {
+                Order* cur_order = orders.get_ref(item_from_tree);
+                return compare_ask_by_priority(order, cur_order);
+            },
+            &self.orders, order);
     }
 
     if (slot.existed) abort("Order already exists in by priority index");
@@ -172,31 +174,34 @@ fn void OrderBook.remove_order_from_by_priority_index(&self, Order* order) @loca
 {
     if (order.side == BID)
     {
-        bool removed = self.bid_by_priority.@remove(; OrderHandle item_from_tree, int* x)
-        {
-            Order* cur_order = self.orders.get_ref(item_from_tree);
-            *x = compare_bid_by_priority(order, cur_order);
-        };
+        bool removed = self.bid_by_priority.@remove(
+            fn int(Pool{Order}* orders, Order* order, OrderHandle item_from_tree) {
+                Order* cur_order = orders.get_ref(item_from_tree);
+                return compare_bid_by_priority(order, cur_order);
+            },
+            &self.orders, order);
         if (!removed) abort("Bid not removed");
     }
     else
     {
-        bool removed = self.ask_by_priority.@remove(; OrderHandle item_from_tree, int* x)
-        {
-            Order* cur_order = self.orders.get_ref(item_from_tree);
-            *x = compare_ask_by_priority(order, cur_order);
-        };
+        bool removed = self.ask_by_priority.@remove(
+            fn int(Pool{Order}* orders, Order* order, OrderHandle item_from_tree) {
+                Order* cur_order = orders.get_ref(item_from_tree);
+                return compare_ask_by_priority(order, cur_order);
+            },
+            &self.orders, order);
         if (!removed) abort("Ask not removed");
     }
 }
 
 fn void OrderBook.add_or_update_order(&self, Order order)
 {
-    BTreeSlot{OrderHandle} slot = self.orders_by_id.@get_slot(; OrderHandle item_from_tree, int* x)
-    {
-        OrderId existing_order_id = self.orders.get_ref(item_from_tree).order_id;
-        *x = compare_order_id(order.order_id, existing_order_id);
-    };
+    BTreeSlot{OrderHandle} slot = self.orders_by_id.@get_slot(
+        fn int(Pool{Order}* orders, Order order, OrderHandle item_from_tree) {
+            OrderId existing_order_id = orders.get_ref(item_from_tree).order_id;
+            return compare_order_id(order.order_id, existing_order_id);
+        },
+        &self.orders, order);
 
     OrderHandle handle;
     Order* order_slot;  // Slot in the pool.
@@ -223,12 +228,13 @@ fn void OrderBook.add_or_update_order(&self, Order order)
 fn void OrderBook.remove_order(&self, OrderId order_id)
 {
     OrderHandle handle;
-    bool removed = self.orders_by_id.@remove(; OrderHandle item_from_tree, int* x)
-    {
-        OrderId existing_order_id = self.orders.get_ref(item_from_tree).order_id;
-        *x = compare_order_id(order_id, existing_order_id);
-        handle = item_from_tree;  // Note which handle was removed.
-    };
+    bool removed = self.orders_by_id.@remove(
+        fn int(OrderHandle* handle, Pool{Order}* orders, OrderId order_id, OrderHandle item_from_tree) {
+            OrderId existing_order_id = orders.get_ref(item_from_tree).order_id;
+            *handle = item_from_tree;  // Note which handle was removed.
+            return compare_order_id(order_id, existing_order_id);
+        },
+        &handle, &self.orders, order_id);
 
     if (!removed) abort("Order not removed because it was not found");
 
@@ -251,11 +257,12 @@ fn Maybe{long} OrderBook.spread(&self)
 
 fn void print_tree(BTree{OrderHandle}* btree, Pool{Order}* pool)
 {
-    btree.@to_dot(io::stdout(); OrderHandle item_from_tree)
-    {
-        Order* order = pool.get_ref(item_from_tree);
-        io::printf("id %d, px %d, h %d", order.order_id, order.price, item_from_tree)!!;
-    }!!;
+    btree.@to_dot(
+        fn void?(OutStream out, Pool{Order}* pool, OrderHandle item_from_tree) {
+            Order* order = pool.get_ref(item_from_tree);
+            io::fprintf(out, "id %d, px %d, h %d", order.order_id, order.price, item_from_tree)!;
+        },
+        io::stdout(), pool)!!;
 }
 
 fn void main()

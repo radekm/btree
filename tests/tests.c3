@@ -61,10 +61,7 @@ fn void parametric_test(usz number_of_items_to_insert, usz min_expected_height)
         generated++;
 
         BTreeSlot{uint} slot;
-        slot = btree.@get_slot(; item_from_tree, int* x)
-        {
-            *x = compare_uints(new, item_from_tree);
-        };
+        slot = btree.@get_slot(compare_uints, new);
 
         // Only insert if the number wans't there before.
         if (!slot.existed)
@@ -87,10 +84,7 @@ fn void parametric_test(usz number_of_items_to_insert, usz min_expected_height)
         uint number = r2.next_int();
 
         BTreeSlot{uint} slot;
-        slot = btree.@get_existing_slot(; item_from_tree, int* x)
-        {
-            *x = compare_uints(number, item_from_tree);
-        };
+        slot = btree.@get_existing_slot(compare_uints, number);
 
         assert(slot.existed);
         assert(*slot.item == number);
@@ -105,10 +99,7 @@ fn void parametric_test(usz number_of_items_to_insert, usz min_expected_height)
     {
         uint number = r3.next_int();
 
-        bool removed = btree.@remove(; item_from_tree, int* x)
-        {
-            *x = compare_uints(number, item_from_tree);
-        };
+        bool removed = btree.@remove(compare_uints, number);
         deleted += (usz)removed;
 
         // Several times during deletition check tree invariants.

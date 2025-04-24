@@ -25,31 +25,19 @@ fn void main()
     btree.init(mem);
 
     BTreeSlot{Item} slot;
-    slot = btree.@get_slot(; item_from_tree, int* x)
-    {
-        *x = compare_strings("nose", item_from_tree.k);
-    };
+    slot = btree.@get_slot(fn int(Item item_from_tree) => compare_strings("nose", item_from_tree.k));
     *slot.item = { .k = "nose", .v = 12 };
 
-    slot = btree.@get_slot(; item_from_tree, int* x)
-    {
-        *x = compare_strings("mouth", item_from_tree.k);
-    };
+    slot = btree.@get_slot(fn int(Item item_from_tree) => compare_strings("mouth", item_from_tree.k));
     *slot.item = { .k = "mouth", .v = 13 };
 
-    slot = btree.@get_slot(; item_from_tree, int* x)
-    {
-        *x = compare_strings("arm", item_from_tree.k);
-    };
+    slot = btree.@get_slot(fn int(Item item_from_tree) => compare_strings("arm", item_from_tree.k));
     *slot.item = { .k = "arm", .v = 7 };
 
     // Item modification.
     // We can replace an item with an equivalent one
     // (for example we can replace a key with the same string which is allocated elsewhere).
-    slot = btree.@get_existing_slot(; item_from_tree, int* x)
-    {
-        *x = compare_strings("mouth", item_from_tree.k);
-    };
+    slot = btree.@get_existing_slot(fn int(Item item_from_tree) => compare_strings("mouth", item_from_tree.k));
     slot.item.v = -1;
 
     io::printfn("root length %s", btree.root.node.len);
