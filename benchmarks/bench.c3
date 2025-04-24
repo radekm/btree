@@ -16,10 +16,7 @@ fn void main()
 
     for (int i = 1; i <= 50_000_000; i++)
     {
-        BTreeSlot{int} slot = set.@get_slot(; int item_from_tree, int* x)
-        {
-            *x = compare_int(i, item_from_tree);
-        };
+        BTreeSlot{int} slot = set.@get_slot(&compare_int, i);
         *slot.item = i;
     }
 
@@ -27,10 +24,7 @@ fn void main()
 
     for (int i = 2; i <= 50_000_000; i += 2)
     {
-        set.@remove(; int item_from_tree, int* x)
-        {
-            *x = compare_int(i, item_from_tree);
-        };
+        set.@remove(&compare_int, i);
     }
 
     io::printfn("After removal: %d", set.number_of_items);

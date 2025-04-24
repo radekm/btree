@@ -20,7 +20,7 @@ struct SearchResult
 //
 // NOTE: It seems that `@body` can't return a value to circumvent this we added
 //       `x` to which `@body` assigns the result.
-macro SearchResult NodeRef.@search_tree(self; @body(Type item_from_tree, int* x))
+macro SearchResult NodeRef.@search_tree(self, #compare, ...)
 {
     NodeRef root = self;
 
@@ -31,8 +31,7 @@ macro SearchResult NodeRef.@search_tree(self; @body(Type item_from_tree, int* x)
         int edge;
         for (; edge < node.len; edge++)
         {
-            int x;
-            @body(node.items[edge], &x);
+            int x = #compare($vasplat, node.items[edge]);
             if (x < 0)
             {
                 // We search for something smaller than `node.items[edge]`.
@@ -101,12 +100,9 @@ struct BTreeSlot
 }
 
 // CONSIDER: Return `Type*?` instead?
-macro BTreeSlot BTree.@get_existing_slot(&self; @body(Type item_from_tree, int* x))
+macro BTreeSlot BTree.@get_existing_slot(&self, #compare, ...)
 {
-    SearchResult sr = self.root.@search_tree(; Type item_from_tree, int* x)
-    {
-        @body(item_from_tree, x);
-    };
+    SearchResult sr = self.root.@search_tree(#compare, $vasplat);
 
     if (!sr.found)
     {
@@ -119,12 +115,9 @@ macro BTreeSlot BTree.@get_existing_slot(&self; @body(Type item_from_tree, int* 
     }
 }
 
-macro BTreeSlot BTree.@get_slot(&self; @body(Type item_from_tree, int* x))
+macro BTreeSlot BTree.@get_slot(&self, #compare, ...)
 {
-    SearchResult sr = self.root.@search_tree(; Type item_from_tree, int* x)
-    {
-        @body(item_from_tree, x);
-    };
+    SearchResult sr = self.root.@search_tree(#compare, $vasplat);
 
     HandleItem handle;
     if (sr.found)
@@ -141,12 +134,9 @@ macro BTreeSlot BTree.@get_slot(&self; @body(Type item_from_tree, int* x))
     return { .existed = sr.found, .item = &node.items[handle.item_idx] };
 }
 
-macro bool BTree.@remove(&self; @body(Type item_from_tree, int* x))
+macro bool BTree.@remove(&self, #compare, ...)
 {
-    SearchResult sr = self.root.@search_tree(; Type item_from_tree, int* x)
-    {
-        @body(item_from_tree, x);
-    };
+    SearchResult sr = self.root.@search_tree(#compare, $vasplat);
 
     if (!sr.found)
     {
