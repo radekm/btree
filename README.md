@@ -7,16 +7,13 @@ The generic type `BTree` represents a B-tree instance. It is initialized using t
 and freed using the `free` method.
 
 The macros `@get_slot`, `@get_existing_slot`, and `@remove` are used to add, modify, and remove items.
-These macros capture a trailing block that performs the comparison. This block receives `item_from_tree`
-and pointer to an `int` for storing the comparison result:
+These macros take a function that performs the comparison. The function takes one or more arguments.
+The last argument is always `item_from_tree`. The function returns a comparison result:
 
 - If the item being added, modified, or removed is less than `item_from_tree`,
   the comparison result should be negative.
 - If it is greater than `item_from_tree`, the result should be positive.
 - If it is equal, the result should be zero.
-
-Macros with trailing blocks are used because C3 does not support closures,
-and comparison logic may need access to variables from the surrounding environment.
 
 This library is useful for building multiple indices over a pool of items.
 The included example `order_book.c3` demonstrates this.
@@ -27,9 +24,12 @@ only bid or ask orders, respectively - and organize them by `price`, `entry_time
 
 ## Performance
 
-The code in `node.c3` was translated from Rust,
-but our B-tree is approximately 10% slower than the Rust version for an unknown reason.
+The code in `node.c3` was translated from Rust.
+It is approximately 10 % slower than the Rust version for unknown reasons.
 Memory usage is the same.
+
+In certain situations our B-tree can be 2–3 times faster
+than the `HashMap` from C3’s standard library.
 
 ## Contributions
 
