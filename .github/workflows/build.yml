@@ -87,3 +87,7 @@ jobs:
           echo "Benchmarking Rust"
           /usr/bin/time -v ./build/bench-rust
           /usr/bin/time -v ./build/bench-rust
+
+          echo "Benchmarking C3 (HashMap)"
+          /usr/bin/time -v ./build/bench_hash_map-c3
+          /usr/bin/time -v ./build/bench_hash_map-c3
