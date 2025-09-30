@@ -125,6 +125,7 @@ macro BTreeSlot BTree.@get_existing_slot(&self, #compare, ...)
     }
 }
 
+// If there's not enough memory this function will panic and it may break B-tree.
 macro BTreeSlot BTree.@get_slot(&self, #compare, ...)
 {
     SearchResult sr = self.root.@search_tree(#compare, $vasplat);
@@ -137,6 +138,125 @@ macro BTreeSlot BTree.@get_slot(&self, #compare, ...)
     else
     {
         handle = sr.insert_position.insert_into_leaf_recursing_up({}, &self.root, self.allocator);
+        self.number_of_items++;
+    }
+
+    LeafNode* node = handle.node_ref.node;
+    return { .existed = sr.found, .item = &node.items[handle.item_idx] };
+}
+
+struct Preallocator (Allocator) @local
+{
+    // B-tree with 2^128 nodes has height less than 64.
+    // So we expect that ability to preallocate 64 nodes is enough.
+    LeafNode*[64] preallocated;
+    usz used;
+}
+
+<*
+ @require number_of_new_nodes > 0
+*>
+fn void? Preallocator.init(&self, Allocator allocator, usz number_of_new_nodes) @local
+{
+    if (number_of_new_nodes > self.preallocated.len) return mem::OUT_OF_MEMORY?;
+
+    bool done;
+
+    // Free all nodes if pre-allocation fails.
+    defer if (!done)
+    {
+        // Free in reverse order.
+        foreach_r (node : self.preallocated)
+        {
+            if (node) allocator::free(allocator, node);
+        }
+    }
+
+    // Insertion will start by splitting leaf and then continue with `number_of_new_nodes - 1` internal nodes.
+
+    // Memory has to be zeroed because `PreAllocator.acquire`
+    // ignores `init_type` and doesn't zero anything it.
+    self.preallocated[0] = allocator::new_try(allocator, LeafNode)!;
+
+    for (int i = 1; i < number_of_new_nodes; i++)
+    {
+        // Memory has to be zeroed.
+        self.preallocated[i] = (LeafNode*)allocator::new_try(allocator, InternalNode)!;
+    }
+    done = true;  // Everything pre-allocated successfully.
+}
+
+fn void*? Preallocator.acquire(&self, usz bytes, AllocInitType init_type, usz alignment) @dynamic @local
+{
+    assert(init_type == ZERO);
+    if (self.used == 0)
+    {
+        assert(bytes == LeafNode.sizeof);
+    }
+    else
+    {
+        assert(bytes == InternalNode.sizeof);
+    }
+    LeafNode* node = self.preallocated[self.used++];
+    assert(node != null);
+    return node;
+}
+
+fn void*? Preallocator.resize(&self, void* old_ptr, usz new_bytes, usz alignment) @dynamic @local
+{
+    abort("Not supported");
+}
+
+fn void Preallocator.release(&self, void* old_ptr, bool aligned) @dynamic @local
+{
+    abort("Not supported");
+}
+
+// If there is not enough memory this function will return `mem::OUT_OF_MEMORY`
+// and B-tree won't be changed.
+macro BTreeSlot? BTree.@get_slot_try(&self, #compare, ...)
+{
+    SearchResult sr = self.root.@search_tree(#compare, $vasplat);
+
+    HandleItem handle;
+    if (sr.found)
+    {
+        handle = sr.existing_item;
+    }
+    else
+    {
+        // Count how many new nodes need to be allocated.
+        usz number_of_new_nodes;
+        {
+            LeafNode* node = sr.insert_position.node_ref.node;
+            while (true)
+            {
+                if (!node)
+                {
+                    // For new root.
+                    number_of_new_nodes++;
+                    break;
+                }
+                if (node.len < CAPACITY) break;
+                number_of_new_nodes++;
+                node = (LeafNode*)node.parent;
+            }
+        }
+
+        if (number_of_new_nodes)
+        {
+            // Preallocate new nodes.
+            Preallocator preallocator;
+            preallocator.init(self.allocator, number_of_new_nodes)!;
+            handle = sr.insert_position.insert_into_leaf_recursing_up({}, &self.root, &preallocator);
+            assert(preallocator.used == number_of_new_nodes, "Preallocated nodes must be used");
+        }
+        else
+        {
+            // No allocations are needed.
+            handle = sr.insert_position.insert_into_leaf_recursing_up({}, &self.root, &allocator::NULL_ALLOCATOR);
+        }
+
         self.number_of_items++;
     }
 

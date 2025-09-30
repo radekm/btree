@@ -42,9 +42,8 @@ fn void BTree{uint}.check_invariants_and_orderding(&self, usz expected_number_of
     assert(actual_count == expected_number_of_items);
 }
 
-fn void parametric_test(usz number_of_items_to_insert, usz min_expected_height)
+macro void parametric_test($prealloc, usz number_of_items_to_insert, usz min_expected_height)
 {
-    // TODO: Currently `BTree` doesn't have `free` so we use temp allocator.
     BTree{uint} btree;
     btree.init(mem);
     defer btree.free();
@@ -61,7 +60,11 @@ fn void parametric_test(usz number_of_items_to_insert, usz min_expected_height)
         generated++;
 
         BTreeSlot{uint} slot;
-        slot = btree.@get_slot(compare_uints, new);
+        $if $prealloc:
+            slot = btree.@get_slot_try(compare_uints, new)!!;
+        $else
+            slot = btree.@get_slot(compare_uints, new);
+        $endif
 
         // Only insert if the number wans't there before.
         if (!slot.existed)
@@ -122,7 +125,18 @@ fn void test_small() @test
     // items can fit into tree with 4 levels. Having one more item guarantees at least 5 levels.
     for (int i; i < 100; i++)
     {
-        parametric_test(20736, 4);
+        parametric_test(false, 20736, 4);
+    }
+}
+
+fn void test_small_with_prealloc() @test
+{
+    // We want to create tree with at least 5 levels (height 4).
+    // 20735 (= 12^0 * 11 + 12^1 * 11 + 12^2 * 11 + 12^3 * 11)
+    // items can fit into tree with 4 levels. Having one more item guarantees at least 5 levels.
+    for (int i; i < 100; i++)
+    {
+        parametric_test(true, 20736, 4);
     }
 }
 
@@ -133,13 +147,24 @@ fn void test_big() @test
     // items can fit into tree with 7 levels. Having one more item guarantees at least 8 levels.
     for (int i; i < 4; i++)
     {
-        parametric_test(35_831_808, 7);
+        parametric_test(false, 35_831_808, 7);
+    }
+}
+
+fn void test_big_with_prealloc() @test
+{
+    // We want to create tree with at least 8 levels (height 7).
+    // 35831807 (= 12^0 * 11 + 12^1 * 11 + 12^2 * 11 + 12^3 * 11 + 12^4 * 11 + 12^5 * 11 + 12^6 * 11)
+    // items can fit into tree with 7 levels. Having one more item guarantees at least 8 levels.
+    for (int i; i < 4; i++)
+    {
+        parametric_test(true, 35_831_808, 7);
     }
 }
 
 fn void test_bigger() @test
 {
-    parametric_test(90_000_000, 7);
+    parametric_test(false, 90_000_000, 7);
 }
 
 // Needs 6 GB of memory.
@@ -148,5 +173,5 @@ fn void test_bigger() @test
 //     // We want to create tree with at least 9 levels (height 8).
 //     // 429981695 (= 12^0 * 11 + 12^1 * 11 + 12^2 * 11 + 12^3 * 11 + 12^4 * 11 + 12^5 * 11 + 12^6 * 11 + 12^7 * 11)
 //     // items can fit into tree with 8 levels. Having one more item guarantees at least 9 levels.
-//     parametric_test(429_981_696, 8);
+//     parametric_test(false, 429_981_696, 8);
 // }
