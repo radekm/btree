@@ -45,7 +45,11 @@ fn void BTree{uint}.check_invariants_and_orderding(&self, usz expected_number_of
 macro void parametric_test($prealloc, usz number_of_items_to_insert, usz min_expected_height)
 {
     BTree{uint} btree;
-    btree.init(mem);
+    $if $prealloc:
+        btree.init_try(mem)!!;
+    $else
+        btree.init(mem);
+    $endif
     defer btree.free();
 
     char[8 * 4] entropy = random::entropy();

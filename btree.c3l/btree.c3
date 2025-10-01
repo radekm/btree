@@ -95,10 +95,23 @@ struct BTree
     usz number_of_items;
 }
 
+// If there's not enough memory this function will panic and B-tree won't be initialized.
 fn void BTree.init(&self, Allocator allocator)
 {
+    LeafNode* node = allocator::new(allocator, LeafNode);
     *self = {
-        .root = { .node = allocator::new(allocator, LeafNode) },
+        .root = { .node = node },
+        .allocator = allocator,
+    };
+}
+
+// If there is not enough memory this function will return `mem::OUT_OF_MEMORY`
+// and B-tree won't be initialized.
+fn void? BTree.init_try(&self, Allocator allocator)
+{
+    LeafNode* node = allocator::new_try(allocator, LeafNode)!;
+    *self = {
+        .root = { .node = node },
         .allocator = allocator,
     };
 }
@@ -162,7 +175,7 @@ fn void? Preallocator.init(&self, Allocator allocator, usz number_of_new_nodes) 
 
     bool done;
 
-    // Free all nodes if pre-allocation fails.
+    // Free all nodes if preallocation fails.
     defer if (!done)
     {
         // Free in reverse order.
@@ -183,7 +196,7 @@ fn void? Preallocator.init(&self, Allocator allocator, usz number_of_new_nodes) 
         // Memory has to be zeroed.
         self.preallocated[i] = (LeafNode*)allocator::new_try(allocator, InternalNode)!;
     }
-    done = true;  // Everything pre-allocated successfully.
+    done = true;  // Everything preallocated successfully.
 }
 
 fn void*? Preallocator.acquire(&self, usz bytes, AllocInitType init_type, usz alignment) @dynamic @local
