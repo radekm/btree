@@ -63,7 +63,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - os: macos-latest
+            arch: arm64
           - os: ubuntu-latest
+            arch: x64
+          - os: windows-latest
             arch: x64
     runs-on: ${{ matrix.os }}
     name: Benchmark
@@ -91,3 +95,11 @@ jobs:
           echo "Benchmarking C3 (HashMap)"
           /usr/bin/time -v ./build/bench_hash_map-c3
           /usr/bin/time -v ./build/bench_hash_map-c3
+
+          echo "Benchmarking insertion and iteration C3"
+          /usr/bin/time -v ./build/insert_iter_bench-c3
+          /usr/bin/time -v ./build/insert_iter_bench-c3
+
+          echo "Benchmarking insertion and iteration Rust"
+          /usr/bin/time -v ./build/insert_iter_bench-rust
+          /usr/bin/time -v ./build/insert_iter_bench-rust
