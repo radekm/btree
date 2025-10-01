@@ -42,7 +42,7 @@ fn void BTree{uint}.check_invariants_and_orderding(&self, usz expected_number_of
     assert(actual_count == expected_number_of_items);
 }
 
-macro void parametric_test($prealloc, usz number_of_items_to_insert, usz min_expected_height)
+macro void parametric_test(bool $prealloc, usz number_of_items_to_insert, usz min_expected_height)
 {
     BTree{uint} btree;
     $if $prealloc:
