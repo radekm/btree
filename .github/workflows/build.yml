@@ -80,26 +80,34 @@ jobs:
       - uses: radekm/setup-c3@v2
         with:
           version: v0.7.5
+      # Since `link.exe` is shadowed by GNU link we have to delete GNU link otherwise Rust benchmark won't link.
+      - name: Prevent conflict of GNU link with Microsoft's linker
+        if: runner.os == 'Windows' && runner.arch == 'X64'
+        shell: bash
+        run: rm /usr/bin/link.exe
       - shell: bash
         run: |
+          # Redirect standard error to standard output otherwise they strangely interleave when running on Windows.
+          exec 2>&1
+
           ./compile-benchmarks.sh
 
           echo "Benchmarking C3"
-          /usr/bin/time -v ./build/bench-c3
-          /usr/bin/time -v ./build/bench-c3
+          time ./build/bench-c3
+          time ./build/bench-c3
 
           echo "Benchmarking Rust"
-          /usr/bin/time -v ./build/bench-rust
-          /usr/bin/time -v ./build/bench-rust
+          time ./build/bench-rust
+          time ./build/bench-rust
 
           echo "Benchmarking C3 (HashMap)"
-          /usr/bin/time -v ./build/bench_hash_map-c3
-          /usr/bin/time -v ./build/bench_hash_map-c3
+          time ./build/bench_hash_map-c3
+          time ./build/bench_hash_map-c3
 
           echo "Benchmarking insertion and iteration C3"
-          /usr/bin/time -v ./build/insert_iter_bench-c3
-          /usr/bin/time -v ./build/insert_iter_bench-c3
+          time ./build/insert_iter_bench-c3
+          time ./build/insert_iter_bench-c3
 
           echo "Benchmarking insertion and iteration Rust"
-          /usr/bin/time -v ./build/insert_iter_bench-rust
-          /usr/bin/time -v ./build/insert_iter_bench-rust
+          time ./build/insert_iter_bench-rust
+          time ./build/insert_iter_bench-rust
