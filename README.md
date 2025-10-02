@@ -32,8 +32,9 @@ So the B-tree can be safely used even after they fail with out of memory.
 ## Performance
 
 The code in `node.c3` was translated from Rust.
-It is approximately 10 % slower than the Rust version for unknown reasons.
-Memory usage is the same.
+It is approximately 10 % slower than the Rust version if we use default `mem` allocator.
+It can be faster than Rust when used with `tmem` allocator backed by `Vmem`
+(ie. compiled with feature `VMEM_TEMP`).
 
 In certain situations our B-tree can be 2–3 times faster
 than the `HashMap` from C3’s standard library.
