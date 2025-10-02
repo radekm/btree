@@ -22,6 +22,13 @@ The `orders_by_id` index organizes these orders by `order_id`.
 The `bid_by_priority` and `ask_by_priority` indices are partial - they include
 only bid or ask orders, respectively - and organize them by `price`, `entry_time_us`, and `order_id`.
 
+## Handling out of memory
+
+Function `init` always allocates memory, macro `@get_slot` allocates memory if it needs to split some nodes.
+Both will panic if they run out of memory. But there's another interface: `init_try` and `@get_slot_try`
+which in case of an allocator error simply return the error and don't change the B-tree.
+So the B-tree can be safely used even after they fail with out of memory.
+
 ## Performance
 
 The code in `node.c3` was translated from Rust.
