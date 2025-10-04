@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: radekm/setup-c3@v2
         with:
-          version: v0.7.5
+          version: v0.7.6
       - shell: bash
         run: |
           ./build.sh
@@ -47,7 +47,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: radekm/setup-c3@v2
         with:
-          version: v0.7.5
+          version: v0.7.6
       - shell: cmd
         run: |
           md build
@@ -79,7 +79,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: radekm/setup-c3@v2
         with:
-          version: v0.7.5
+          version: v0.7.6
       # Since `link.exe` is shadowed by GNU link we have to delete GNU link otherwise Rust benchmark won't link.
       - name: Prevent conflict of GNU link with Microsoft's linker
         if: runner.os == 'Windows' && runner.arch == 'X64'
