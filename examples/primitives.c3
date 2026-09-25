@@ -11,7 +11,7 @@ struct Item
 
 fn int compare_strings(String a, String b)
 {
-    int res = libc::memcmp(a.ptr, b.ptr, min(a.len, b.len));
+    int res = libc::memcmp(a.ptr, b.ptr, (usz)min(a.len, b.len));
     if (res < 0) return -1;
     if (res > 0) return 1;
     if (a.len < b.len) return -1;

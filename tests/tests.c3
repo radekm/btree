@@ -11,7 +11,7 @@ fn int compare_uints(uint a, uint b)
 // `OutStream` which throws everything away.
 typedef Trash (OutStream) = uint;
 
-fn usz? Trash.write(&self, char[] buffer) @dynamic
+fn sz? Trash.write(&self, char[] buffer) @dynamic
 {
     return buffer.len;
 }
@@ -20,7 +20,7 @@ fn void? Trash.write_byte(&self, char c) @dynamic
 {
 }
 
-fn void BTree{uint}.check_invariants_and_orderding(&self, usz expected_number_of_items)
+fn void BTree{uint}.check_invariants_and_orderding(&self, sz expected_number_of_items)
 {
     // Check invariants.
     assert(self.number_of_items == expected_number_of_items);
@@ -42,7 +42,7 @@ fn void BTree{uint}.check_invariants_and_orderding(&self, usz expected_number_of
     assert(actual_count == expected_number_of_items);
 }
 
-macro void parametric_test(bool $prealloc, usz number_of_items_to_insert, usz min_expected_height)
+macro void parametric_test(bool $prealloc, sz number_of_items_to_insert, sz min_expected_height)
 {
     BTree{uint} btree;
     $if $prealloc:
@@ -55,8 +55,8 @@ macro void parametric_test(bool $prealloc, usz number_of_items_to_insert, usz mi
     char[8 * 4] entropy = random::entropy();
     Sfc64Random r;
     r.set_seed(&entropy);
-    usz generated;
-    usz inserted;
+    sz generated;
+    sz inserted;
 
     while (inserted < number_of_items_to_insert)
     {
@@ -100,14 +100,14 @@ macro void parametric_test(bool $prealloc, usz number_of_items_to_insert, usz mi
     // Delete numbers.
     Sfc64Random r3;
     r3.set_seed(&entropy);
-    usz deleted;
+    sz deleted;
 
     for (int i; i < generated; i++)
     {
         uint number = r3.next_int();
 
         bool removed = btree.@remove(compare_uints, number);
-        deleted += (usz)removed;
+        deleted += (sz)removed;
 
         // Several times during deletition check tree invariants.
         if (generated / 100 > 0 && i % (generated / 100) == 0)

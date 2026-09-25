@@ -1,4 +1,4 @@
-module btree{Type};
+module btree <Type>;
 
 fn void HandleItem.remove_leaf_item(self, NodeRef* orig_root, Allocator allocator)
 {
@@ -35,7 +35,7 @@ fn void HandleItem.remove_leaf_item(self, NodeRef* orig_root, Allocator allocato
                 .height = node_ref.height - 1,
                 .node = new_root,
             };
-            allocator::free(allocator, node_ref.node);
+            alloc::free(allocator, node_ref.node);
 
             return;
         }
@@ -83,7 +83,7 @@ fn void HandleItem.remove_internal_item(self, NodeRef* orig_root, Allocator allo
 
     // Replace the original item with the rightmost item from the leaf
     // and remove the rightmost item from the leaf.
-    usz item_to_remove_idx = (usz)node_ref.node.len - 1;
+    sz item_to_remove_idx = (sz)node_ref.node.len - 1;
     self.node_ref.node.items[self.item_idx] = node_ref.node.items[item_to_remove_idx];
     HandleItem to_remove = {
         .node_ref = node_ref,

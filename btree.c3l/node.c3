@@ -1,11 +1,11 @@
-module btree{Type};
+module btree <Type>;
 
-const usz B = 6;
-const usz CAPACITY = 2 * B - 1;
-const usz MIN_LEN_AFTER_SPLIT = B - 1;
-const usz ITEM_IDX_CENTER = B - 1;
-const usz EDGE_IDX_LEFT_OF_CENTER = B - 1;
-const usz EDGE_IDX_RIGHT_OF_CENTER = B;
+const sz B = 6;
+const sz CAPACITY = 2 * B - 1;
+const sz MIN_LEN_AFTER_SPLIT = B - 1;
+const sz ITEM_IDX_CENTER = B - 1;
+const sz EDGE_IDX_LEFT_OF_CENTER = B - 1;
+const sz EDGE_IDX_RIGHT_OF_CENTER = B;
 
 struct LeafNode
 {
@@ -42,7 +42,7 @@ struct NodeRef
     // We only need to store the height of the root
     // node, and derive every other node's height from it.
     // Must be zero if type is leaf and non-zero if type is internal.
-    usz height;
+    sz height;
     // The pointer to the leaf or internal node. The definition of `InternalNode`
     // ensures that the pointer is valid either way.
     LeafNode* node;
@@ -52,7 +52,7 @@ struct NodeRef
 struct HandleItem
 {
     NodeRef node_ref;
-    usz item_idx;
+    sz item_idx;
 }
 
 // A reference to a specific edge within a node.
@@ -64,7 +64,7 @@ struct HandleItem
 struct HandleEdge
 {
     NodeRef node_ref;  // Parent node. Child node may not exist if the parent is a leaf.
-    usz edge_idx;
+    sz edge_idx;
 }
 
 // ----------------------------------------------------------------------------
@@ -73,54 +73,58 @@ struct HandleEdge
 
 <*
  @require dest != src : "Aliasing is not allowed"
- @require dest_idx <= CAPACITY && dest_idx + count <= CAPACITY
- @require src_idx <= CAPACITY && src_idx + count <= CAPACITY
+ @require dest_idx >= 0 && dest_idx <= CAPACITY && dest_idx + count <= CAPACITY
+ @require src_idx >= 0 && src_idx <= CAPACITY && src_idx + count <= CAPACITY
+ @require count >= 0
 *>
-fn void mem_copy_items(LeafNode* dest, usz dest_idx, LeafNode* src, usz src_idx, usz count)
+fn void mem_copy_items(LeafNode* dest, sz dest_idx, LeafNode* src, sz src_idx, sz count)
 {
     // We do pointer arithmetic because `&dest.items[dest_idx]`
     // may fail with index out of bounds when `dest_idx == dest.len` and `count == 0`.
    mem::copy(
         &dest.items[0] + dest_idx,
         &src.items[0] + src_idx,
-        count * Type.sizeof);
+        count * Type::size);
 }
 
 <*
- @require dest_idx <= CAPACITY && dest_idx + count <= CAPACITY
- @require src_idx <= CAPACITY && src_idx + count <= CAPACITY
+ @require dest_idx >= 0 && dest_idx <= CAPACITY && dest_idx + count <= CAPACITY
+ @require src_idx >= 0 && src_idx <= CAPACITY && src_idx + count <= CAPACITY
+ @require count >= 0
 *>
-fn void mem_move_items(LeafNode* dest_and_src, usz dest_idx, usz src_idx, usz count)
+fn void mem_move_items(LeafNode* dest_and_src, sz dest_idx, sz src_idx, sz count)
 {
     mem::move(
         &dest_and_src.items[0] + dest_idx,
         &dest_and_src.items[0] + src_idx,
-        count * Type.sizeof);
+        count * Type::size);
 }
 
 <*
  @require dest != src : "Aliasing is not allowed"
- @require dest_idx <= CAPACITY + 1 && dest_idx + count <= CAPACITY + 1
- @require src_idx <= CAPACITY + 1 && src_idx + count <= CAPACITY + 1
+ @require dest_idx >= 0 && dest_idx <= CAPACITY + 1 && dest_idx + count <= CAPACITY + 1
+ @require src_idx >= 0 && src_idx <= CAPACITY + 1 && src_idx + count <= CAPACITY + 1
+ @require count >= 0
 *>
-fn void mem_copy_edges(InternalNode* dest, usz dest_idx, InternalNode* src, usz src_idx, usz count)
+fn void mem_copy_edges(InternalNode* dest, sz dest_idx, InternalNode* src, sz src_idx, sz count)
 {
     mem::copy(
         &dest.edges[0] + dest_idx,
         &src.edges[0] + src_idx,
-        count * (LeafNode*).sizeof);
+        count * LeafNode*::size);
 }
 
 <*
- @require dest_idx <= CAPACITY + 1 && dest_idx + count <= CAPACITY + 1
- @require src_idx <= CAPACITY + 1 && src_idx + count <= CAPACITY + 1
+ @require dest_idx >= 0 && dest_idx <= CAPACITY + 1 && dest_idx + count <= CAPACITY + 1
+ @require src_idx >= 0 && src_idx <= CAPACITY + 1 && src_idx + count <= CAPACITY + 1
+ @require count >= 0
 *>
-fn void mem_move_edges(InternalNode* dest_and_src, usz dest_idx, usz src_idx, usz count)
+fn void mem_move_edges(InternalNode* dest_and_src, sz dest_idx, sz src_idx, sz count)
 {
     mem::move(
         &dest_and_src.edges[0] + dest_idx,
         &dest_and_src.edges[0] + src_idx,
-        count * (LeafNode*).sizeof);
+        count * LeafNode*::size);
 }
 
 // ----------------------------------------------------------------------------
@@ -129,8 +133,8 @@ fn void mem_move_edges(InternalNode* dest_and_src, usz dest_idx, usz src_idx, us
 
 struct SplitPoint
 {
-    usz middle_item_idx;
-    usz insert_idx;
+    sz middle_item_idx;
+    sz insert_idx;
     // Determines whether `insert_idx` is edge index in the left or in the right part.
     bool insert_into_left;
 }
@@ -141,9 +145,9 @@ struct SplitPoint
 // the items and edges to the left of the split point become the left child;
 // the items and edges to the right of the split point become the right child.
 <*
- @require edge_idx <= CAPACITY
+ @require edge_idx >= 0 && edge_idx <= CAPACITY
 *>
-fn SplitPoint split_point(usz edge_idx)
+fn SplitPoint split_point(sz edge_idx)
 {
     // Rust issue #74834 tries to explain these symmetric rules.
     switch
@@ -163,28 +167,28 @@ fn SplitPoint split_point(usz edge_idx)
 
 // `items` is the slice with existing items.
 <*
- @require at < CAPACITY
+ @require at >= 0 && at < CAPACITY
 *>
-fn void slice_insert_item(Type[] items, usz at, Type item)
+fn void slice_insert_item(Type[] items, sz at, Type item)
 {
     if (items.len != at)
     {
         // We need to move elements.
-        mem::move(items.ptr + at + 1, items.ptr + at, (items.len - at) * Type.sizeof);
+        mem::move(items.ptr + at + 1, items.ptr + at, (items.len - at) * Type::size);
     }
     items.ptr[at] = item;
 }
 
 // `edges` is the slice with existing edges.
 <*
- @require at < CAPACITY + 1
+ @require at >= 0 && at < CAPACITY + 1
 *>
-fn void slice_insert_edge(LeafNode*[] edges, usz at, LeafNode* edge)
+fn void slice_insert_edge(LeafNode*[] edges, sz at, LeafNode* edge)
 {
     if (edges.len != at)
     {
         // We need to move elements.
-        mem::move(edges.ptr + at + 1, edges.ptr + at, (edges.len - at) * (LeafNode*).sizeof);
+        mem::move(edges.ptr + at + 1, edges.ptr + at, (edges.len - at) * LeafNode*::size);
     }
     edges.ptr[at] = edge;
 }
@@ -197,7 +201,7 @@ fn void slice_insert_edge(LeafNode*[] edges, usz at, LeafNode* edge)
 fn HandleItem HandleEdge.insert_fit_into_leaf(self, Type item)
 {
     LeafNode* node = self.node_ref.node;
-    usz cur_len = node.len;
+    sz cur_len = node.len;
     slice_insert_item(node.items[:cur_len], self.edge_idx, item);
     node.len++;
 
@@ -233,8 +237,8 @@ fn SplitResult HandleItem.split_leaf(self, Allocator allocator)
     result.left = self.node_ref;
     result.item = orig_node.items[self.item_idx];
 
-    LeafNode* new_node = allocator::new(allocator, LeafNode);  // Right node.
-    new_node.len = (ushort)((usz)orig_node.len - self.item_idx - 1);
+    LeafNode* new_node = alloc::new(allocator, LeafNode);  // Right node.
+    new_node.len = (ushort)((sz)orig_node.len - self.item_idx - 1);
     mem_copy_items(new_node, 0, orig_node, self.item_idx + 1, new_node.len);
     result.right.node = new_node;
 
@@ -276,12 +280,12 @@ fn InsertIntoLeafResult HandleEdge.insert_into_leaf(self, Type item, Allocator a
 
 // `from` and `to_excl` are for edge indices.
 <*
- @require from <= to_excl
- @require to_excl <= CAPACITY + 1
+ @require from >= 0 && from <= to_excl
+ @require to_excl >= 0 && to_excl <= CAPACITY + 1
 *>
-fn void InternalNode.correct_childrens_parent_links(&self, usz from, usz to_excl)
+fn void InternalNode.correct_childrens_parent_links(&self, sz from, sz to_excl)
 {
-    for (usz i = from; i < to_excl; i++)
+    for (sz i = from; i < to_excl; i++)
     {
         LeafNode* child = self.edges[i];
         child.parent = self;
@@ -302,13 +306,13 @@ fn void InternalNode.correct_childrens_parent_links(&self, usz from, usz to_excl
 fn void HandleEdge.insert_fit_into_internal(self, Type item, NodeRef edge)
 {
     LeafNode* node = self.node_ref.node;
-    usz cur_len = node.len;
+    sz cur_len = node.len;
     slice_insert_item(node.items[:cur_len], self.edge_idx, item);
     InternalNode* internal_node = (InternalNode*)node;
     slice_insert_edge(internal_node.edges[:cur_len+1], self.edge_idx + 1, edge.node);
     node.len++;
 
-    internal_node.correct_childrens_parent_links(self.edge_idx + 1, (usz)node.len + 1);
+    internal_node.correct_childrens_parent_links(self.edge_idx + 1, (sz)node.len + 1);
 }
 
 fn SplitResult HandleItem.split_internal(self, Allocator allocator)
@@ -319,11 +323,11 @@ fn SplitResult HandleItem.split_internal(self, Allocator allocator)
     result.left = self.node_ref;
     result.item = orig_node.data.items[self.item_idx];
 
-    InternalNode* new_node = allocator::new(allocator, InternalNode);  // Right node.
-    new_node.data.len = (ushort)((usz)orig_node.data.len - self.item_idx - 1);
+    InternalNode* new_node = alloc::new(allocator, InternalNode);  // Right node.
+    new_node.data.len = (ushort)((sz)orig_node.data.len - self.item_idx - 1);
     mem_copy_items(&new_node.data, 0, &orig_node.data, self.item_idx + 1, new_node.data.len);
-    mem_copy_edges(new_node, 0, orig_node, self.item_idx + 1, (usz)new_node.data.len + 1);
-    new_node.correct_childrens_parent_links(0, (usz)new_node.data.len + 1);
+    mem_copy_edges(new_node, 0, orig_node, self.item_idx + 1, (sz)new_node.data.len + 1);
+    new_node.correct_childrens_parent_links(0, (sz)new_node.data.len + 1);
     result.right.node = &new_node.data;
     result.right.height = self.node_ref.height;
 
@@ -402,7 +406,7 @@ fn HandleItem HandleEdge.insert_into_leaf_recursing_up(self, Type item, NodeRef*
         else
         {
             // Root has been split. Replace the original root by a newly constructed root.
-            InternalNode* new_root = allocator::new(allocator, InternalNode);
+            InternalNode* new_root = alloc::new(allocator, InternalNode);
             new_root.data.items[0] = split.item;
             new_root.data.len = 1;
             new_root.edges[0] = split.left.node;
@@ -470,7 +474,7 @@ fn BalancingContext NodeRef.choose_parent_item(self)
                     .height = self.height + 1,
                     .node = &parent.data,
                 },
-                .item_idx = (usz)self.node.parent_edge_idx - 1,
+                .item_idx = (sz)self.node.parent_edge_idx - 1,
             },
             .left_child = {
                 .height = self.height,
@@ -502,13 +506,13 @@ fn BalancingContext NodeRef.choose_parent_item(self)
 
 fn bool BalancingContext.can_merge(self)
 {
-    return self.left_child.node.len + 1 + self.right_child.node.len <= CAPACITY;
+    return (sz)self.left_child.node.len + 1 + (sz)self.right_child.node.len <= CAPACITY;
 }
 
 // Merges the parent's item and both adjacent child nodes into
 // the left child node and frees the right child node.
 <*
- @require self.left_child.node.len + 1 + self.right_child.node.len <= CAPACITY : "Cannot merge because node capacity would be exceeded"
+ @require (sz)self.left_child.node.len + 1 + (sz)self.right_child.node.len <= CAPACITY : "Cannot merge because node capacity would be exceeded"
 *>
 fn void BalancingContext.do_merge(self, Allocator allocator)
 {
@@ -520,12 +524,12 @@ fn void BalancingContext.do_merge(self, Allocator allocator)
 
     left_child.items[left_child.len] = parent.data.items[self.parent.item_idx];
     mem_copy_items(
-        left_child, (usz)left_child.len + 1,
+        left_child, (sz)left_child.len + 1,
         right_child, 0,
         right_child.len);
 
     // Remove item from parent.
-    usz num_of_items_to_move = parent.data.len - self.parent.item_idx - 1;
+    sz num_of_items_to_move = parent.data.len - self.parent.item_idx - 1;
     mem_move_items(
         &parent.data,
         // `self.parent.item_idx` is left edge before the item which has been moved from parent.
@@ -537,10 +541,10 @@ fn void BalancingContext.do_merge(self, Allocator allocator)
     // Remove edge leading to right child from parent
 
     // `parent.data.len + 1` is the original number of edges before removal.
-    usz num_of_remaining_edges = parent.data.len;
+    sz num_of_remaining_edges = parent.data.len;
     // The number edges which don't need to move (left edge and all edges on its left side).
-    usz num_of_edges_to_stay = self.parent.item_idx + 1;
-    usz num_of_edges_to_move = num_of_remaining_edges - num_of_edges_to_stay;
+    sz num_of_edges_to_stay = self.parent.item_idx + 1;
+    sz num_of_edges_to_move = num_of_remaining_edges - num_of_edges_to_stay;
     mem_move_edges(
         parent,
         // `self.parent.item_idx` is left edge before the item which has been moved from parent.
@@ -557,12 +561,12 @@ fn void BalancingContext.do_merge(self, Allocator allocator)
         InternalNode* left = (InternalNode*)left_child;
         InternalNode* right = (InternalNode*)right_child;
         mem_copy_edges(
-            left, (usz)left_child.len + 1,
+            left, (sz)left_child.len + 1,
             right, 0,
-            (usz)right_child.len + 1);
+            (sz)right_child.len + 1);
         left.correct_childrens_parent_links(
-            (usz)left_child.len + 1,
-            (usz)left_child.len + 1 + (usz)right_child.len + 1);
+            (sz)left_child.len + 1,
+            (sz)left_child.len + 1 + (sz)right_child.len + 1);
     }
 
     // Fix lengths.
@@ -570,7 +574,7 @@ fn void BalancingContext.do_merge(self, Allocator allocator)
     left_child.len += 1 + right_child.len;
 
     // Deallocate right node.
-    allocator::free(allocator, right_child);
+    alloc::free(allocator, right_child);
 }
 
 <*
@@ -578,7 +582,7 @@ fn void BalancingContext.do_merge(self, Allocator allocator)
  @require self.left_child.node.len >= count : "Not enough items to steal"
  @require self.right_child.node.len + count <= CAPACITY : "Cannot steal because node capacity would be exceeded"
 *>
-fn void BalancingContext.bulk_steal_left(self, usz count)
+fn void BalancingContext.bulk_steal_left(self, sz count)
 {
     LeafNode* parent = self.parent.node_ref.node;
     LeafNode* left_child = self.left_child.node;
@@ -600,13 +604,13 @@ fn void BalancingContext.bulk_steal_left(self, usz count)
         InternalNode* right = (InternalNode*)right_child;
 
         // Make room for stolen edges.
-        mem_move_edges(right, count, 0, (usz)right_child.len + 1);
+        mem_move_edges(right, count, 0, (sz)right_child.len + 1);
         // Move edges.
-        mem_copy_edges(right, 0, left, (usz)left_child.len + 1 - count, count);
+        mem_copy_edges(right, 0, left, (sz)left_child.len + 1 - count, count);
 
         // We have to correct parent links from all children
         // (existing children were shifted so their `parent_edge_idx` changed).
-        right.correct_childrens_parent_links(0, (usz)right_child.len + 1 + count);
+        right.correct_childrens_parent_links(0, (sz)right_child.len + 1 + count);
     }
 
     left_child.len -= (ushort)count;
@@ -618,7 +622,7 @@ fn void BalancingContext.bulk_steal_left(self, usz count)
  @require self.left_child.node.len + count <= CAPACITY : "Cannot steal because node capacity would be exceeded"
  @require self.right_child.node.len >= count : "Not enough items to steal"
 *>
-fn void BalancingContext.bulk_steal_right(self, usz count)
+fn void BalancingContext.bulk_steal_right(self, sz count)
 {
     LeafNode* parent = self.parent.node_ref.node;
     LeafNode* left_child = self.left_child.node;
@@ -627,7 +631,7 @@ fn void BalancingContext.bulk_steal_right(self, usz count)
     // Move item from parent to left child.
     left_child.items[left_child.len] = parent.items[self.parent.item_idx];
     // Move items from right child to left child.
-    mem_copy_items(left_child, (usz)left_child.len + 1, right_child, 0, count - 1);
+    mem_copy_items(left_child, (sz)left_child.len + 1, right_child, 0, count - 1);
     // Move item from right child to parent.
     parent.items[self.parent.item_idx] = right_child.items[count - 1];
     // Shift remaining items in right child.
@@ -640,13 +644,13 @@ fn void BalancingContext.bulk_steal_right(self, usz count)
         InternalNode* right = (InternalNode*)right_child;
 
         // Move edges.
-        mem_copy_edges(left, (usz)left_child.len + 1, right, 0, count);
+        mem_copy_edges(left, (sz)left_child.len + 1, right, 0, count);
         // Shift remaining edges in right child.
-        mem_move_edges(right, 0, count, (usz)right_child.len + 1 - count);
+        mem_move_edges(right, 0, count, (sz)right_child.len + 1 - count);
 
         // We have to correct parent links.
-        left.correct_childrens_parent_links((usz)left_child.len + 1, (usz)left_child.len + 1 + count);
-        right.correct_childrens_parent_links(0, (usz)right_child.len + 1 - count);
+        left.correct_childrens_parent_links((sz)left_child.len + 1, (sz)left_child.len + 1 + count);
+        right.correct_childrens_parent_links(0, (sz)right_child.len + 1 - count);
     }
 
     left_child.len += (ushort)count;

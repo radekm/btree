@@ -1,4 +1,4 @@
-module pool{Type};
+module pool <Type>;
 
 import std;
 
@@ -34,8 +34,8 @@ fn Handle Pool.add(&self)
     if (self.first_freelist_node.has_value)
     {
         Handle handle = self.first_freelist_node.value;
-        self.first_freelist_node = self.data[(usz)handle].freelist_node;
-        self.data[(usz)handle] = { .item = {} };  // Replace freelist node by zero item.
+        self.first_freelist_node = self.data[(sz)handle].freelist_node;
+        self.data[(sz)handle] = { .item = {} };  // Replace freelist node by zero item.
         return handle;
     }
     else
@@ -47,12 +47,12 @@ fn Handle Pool.add(&self)
 
 fn Type* Pool.get_ref(&self, Handle handle)
 {
-    return &self.data[(usz)handle].item;
+    return &self.data[(sz)handle].item;
 }
 
 fn void Pool.remove(&self, Handle handle)
 {
-    self.data[(usz)handle].freelist_node = self.first_freelist_node;
+    self.data[(sz)handle].freelist_node = self.first_freelist_node;
     self.first_freelist_node = maybe::value{Handle}(handle);
 }
 
@@ -143,7 +143,7 @@ fn void OrderBook.free(&self)
     self.ask_by_priority.free();
 }
 
-fn void OrderBook.add_order_to_by_priority_index(&self, OrderHandle handle) @local
+fn void OrderBook.add_order_to_by_priority_index(&self, OrderHandle handle)
 {
     Order* order = self.orders.get_ref(handle);
     BTreeSlot{OrderHandle} slot;
@@ -170,7 +170,7 @@ fn void OrderBook.add_order_to_by_priority_index(&self, OrderHandle handle) @loc
     *slot.item = handle;
 }
 
-fn void OrderBook.remove_order_from_by_priority_index(&self, Order* order) @local
+fn void OrderBook.remove_order_from_by_priority_index(&self, Order* order)
 {
     if (order.side == BID)
     {
@@ -272,21 +272,21 @@ fn void main()
     defer ob.free();
 
     ob.add_or_update_order({
-        .order_id = 1,
+        .order_id = (OrderId)1,
         .price = 10,
         .quantity = 4,
         .entry_time_us = 1,
         .side = BID,
     });
     ob.add_or_update_order({
-        .order_id = 2,
+        .order_id = (OrderId)2,
         .price = 11,
         .quantity = 5,
         .entry_time_us = 2,
         .side = BID,
     });
     ob.add_or_update_order({
-        .order_id = 3,
+        .order_id = (OrderId)3,
         .price = 14,
         .quantity = 5,
         .entry_time_us = 2,
@@ -300,7 +300,7 @@ fn void main()
 
     // Order 1 improves price to jump over order 2.
     ob.add_or_update_order({
-        .order_id = 1,
+        .order_id = (OrderId)1,
         .price = 12,
         .quantity = 5,
         .entry_time_us = 1,
@@ -310,12 +310,12 @@ fn void main()
     assert(ob.spread().value == 2);
 
     // Remove best bid.
-    ob.remove_order(1);
+    ob.remove_order((OrderId)1);
 
     assert(ob.spread().value == 3);
 
     // Remove remaining bid.
-    ob.remove_order(2);
+    ob.remove_order((OrderId)2);
 
     assert(!ob.spread().has_value);
     assert(ob.orders_by_id.number_of_items == 1);

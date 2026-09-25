@@ -21,9 +21,9 @@ jobs:
           git config --global core.autocrlf false
           git config --global core.eol lf
       - uses: actions/checkout@v4
-      - uses: radekm/setup-c3@v2
+      - uses: radekm/setup-c3@v3
         with:
-          version: v0.7.8
+          version: v0.8.4
       - shell: bash
         run: |
           ./build.sh
@@ -45,9 +45,9 @@ jobs:
           git config --global core.autocrlf false
           git config --global core.eol lf
       - uses: actions/checkout@v4
-      - uses: radekm/setup-c3@v2
+      - uses: radekm/setup-c3@v3
         with:
-          version: v0.7.8
+          version: v0.8.4
       - shell: cmd
         run: |
           md build
@@ -77,9 +77,9 @@ jobs:
           git config --global core.autocrlf false
           git config --global core.eol lf
       - uses: actions/checkout@v4
-      - uses: radekm/setup-c3@v2
+      - uses: radekm/setup-c3@v3
         with:
-          version: v0.7.8
+          version: v0.8.4
       # Since `link.exe` is shadowed by GNU link we have to delete GNU link otherwise Rust benchmark won't link.
       - name: Prevent conflict of GNU link with Microsoft's linker
         if: runner.os == 'Windows' && runner.arch == 'X64'

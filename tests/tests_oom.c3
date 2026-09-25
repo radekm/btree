@@ -7,17 +7,17 @@ struct MustRetryAllocator (Allocator) @local
 {
     Allocator allocator;
     List{void*} free;
-    usz ooms;
+    sz ooms;
 }
 
-fn void MustRetryAllocator.init(&self, Allocator allocator) @local
+fn void MustRetryAllocator.init(&self, Allocator allocator)
 {
     self.allocator = allocator;
     self.free.init(allocator);
 }
 
 // Doesn't check size. Instead it assumes that allocations are done in the same order when retried.
-fn void*? MustRetryAllocator.acquire(&self, usz bytes, AllocInitType init_type, usz alignment) @dynamic @local
+fn void*? MustRetryAllocator.acquire(&self, sz bytes, AllocInitType init_type, sz alignment) @dynamic
 {
     void*? allocation = self.free.pop();
     if (catch allocation)
@@ -25,18 +25,18 @@ fn void*? MustRetryAllocator.acquire(&self, usz bytes, AllocInitType init_type, 
         self.ooms++;
         void* ptr = self.allocator.acquire(bytes, init_type, alignment)!;
         self.free.push(ptr);
-        return mem::OUT_OF_MEMORY?;
+        return mem::OUT_OF_MEMORY~;
     }
     void* ptr = allocation;
     return ptr;
 }
 
-fn void*? MustRetryAllocator.resize(&self, void* old_ptr, usz new_bytes, usz alignment) @dynamic @local
+fn void*? MustRetryAllocator.resize(&self, void* old_ptr, sz new_bytes, sz alignment) @dynamic
 {
     abort("Not supported");
 }
 
-fn void MustRetryAllocator.release(&self, void* old_ptr, bool aligned) @dynamic @local
+fn void MustRetryAllocator.release(&self, void* old_ptr, bool aligned) @dynamic
 {
     self.free.push(old_ptr);
 }
@@ -48,7 +48,7 @@ fn int compare_uints(uint a, uint b)
     return 0;
 }
 
-fn void parametric_test_oom(usz number_of_items_to_insert, usz min_expected_height) => @pool()
+fn void parametric_test_oom(sz number_of_items_to_insert, sz min_expected_height) => @pool()
 {
     MustRetryAllocator allocator;
     allocator.init(tmem);
@@ -63,8 +63,8 @@ fn void parametric_test_oom(usz number_of_items_to_insert, usz min_expected_heig
     char[8 * 4] entropy = random::entropy();
     Sfc64Random r;
     r.set_seed(&entropy);
-    usz generated;
-    usz inserted;
+    sz generated;
+    sz inserted;
 
     while (inserted < number_of_items_to_insert)
     {

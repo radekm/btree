@@ -1,4 +1,4 @@
-module btree{Type};
+module btree <Type>;
 
 import std::collections::maybe;
 import std::io;
@@ -41,7 +41,7 @@ macro SearchResult NodeRef.@search_tree(self, #compare, ...)
         int edge;
         for (; edge < node.len; edge++)
         {
-            int x = #compare($vasplat, node.items[edge]);
+            int x = #compare(...$vaarg, node.items[edge]);
             if (x < 0)
             {
                 // We search for something smaller than `node.items[edge]`.
@@ -92,13 +92,13 @@ struct BTree
 {
     NodeRef root;
     Allocator allocator;
-    usz number_of_items;
+    sz number_of_items;
 }
 
 // If there's not enough memory this function will panic and B-tree won't be initialized.
 fn void BTree.init(&self, Allocator allocator)
 {
-    LeafNode* node = allocator::new(allocator, LeafNode);
+    LeafNode* node = alloc::new(allocator, LeafNode);
     *self = {
         .root = { .node = node },
         .allocator = allocator,
@@ -109,7 +109,7 @@ fn void BTree.init(&self, Allocator allocator)
 // and B-tree won't be initialized.
 fn void? BTree.init_try(&self, Allocator allocator)
 {
-    LeafNode* node = allocator::new_try(allocator, LeafNode)!;
+    LeafNode* node = alloc::new_try(allocator, LeafNode)!;
     *self = {
         .root = { .node = node },
         .allocator = allocator,
@@ -125,7 +125,7 @@ struct BTreeSlot
 // CONSIDER: Return `Type*?` instead?
 macro BTreeSlot BTree.@get_existing_slot(&self, #compare, ...)
 {
-    SearchResult sr = self.root.@search_tree(#compare, $vasplat);
+    SearchResult sr = self.root.@search_tree(#compare, ...$vaarg);
 
     if (!sr.found)
     {
@@ -141,7 +141,7 @@ macro BTreeSlot BTree.@get_existing_slot(&self, #compare, ...)
 // If there's not enough memory this function will panic and it may break B-tree.
 macro BTreeSlot BTree.@get_slot(&self, #compare, ...)
 {
-    SearchResult sr = self.root.@search_tree(#compare, $vasplat);
+    SearchResult sr = self.root.@search_tree(#compare, ...$vaarg);
 
     HandleItem handle;
     if (sr.found)
@@ -163,15 +163,15 @@ struct Preallocator (Allocator) @local
     // B-tree with 2^128 nodes has height less than 64.
     // So we expect that ability to preallocate 64 nodes is enough.
     LeafNode*[64] preallocated;
-    usz used;
+    sz used;
 }
 
 <*
  @require number_of_new_nodes > 0
 *>
-fn void? Preallocator.init(&self, Allocator allocator, usz number_of_new_nodes) @local
+fn void? Preallocator.init(&self, Allocator allocator, sz number_of_new_nodes)
 {
-    if (number_of_new_nodes > self.preallocated.len) return mem::OUT_OF_MEMORY?;
+    if (number_of_new_nodes > self.preallocated.len) return mem::OUT_OF_MEMORY~;
 
     bool done;
 
@@ -181,7 +181,7 @@ fn void? Preallocator.init(&self, Allocator allocator, usz number_of_new_nodes) 
         // Free in reverse order.
         foreach_r (node : self.preallocated)
         {
-            if (node) allocator::free(allocator, node);
+            if (node) alloc::free(allocator, node);
         }
     }
 
@@ -189,38 +189,38 @@ fn void? Preallocator.init(&self, Allocator allocator, usz number_of_new_nodes) 
 
     // Memory has to be zeroed because `PreAllocator.acquire`
     // ignores `init_type` and doesn't zero anything it.
-    self.preallocated[0] = allocator::new_try(allocator, LeafNode)!;
+    self.preallocated[0] = alloc::new_try(allocator, LeafNode)!;
 
     for (int i = 1; i < number_of_new_nodes; i++)
     {
         // Memory has to be zeroed.
-        self.preallocated[i] = (LeafNode*)allocator::new_try(allocator, InternalNode)!;
+        self.preallocated[i] = (LeafNode*)alloc::new_try(allocator, InternalNode)!;
     }
     done = true;  // Everything preallocated successfully.
 }
 
-fn void*? Preallocator.acquire(&self, usz bytes, AllocInitType init_type, usz alignment) @dynamic @local
+fn void*? Preallocator.acquire(&self, sz bytes, AllocInitType init_type, sz alignment) @dynamic
 {
     assert(init_type == ZERO);
     if (self.used == 0)
     {
-        assert(bytes == LeafNode.sizeof);
+        assert(bytes == LeafNode::size);
     }
     else
     {
-        assert(bytes == InternalNode.sizeof);
+        assert(bytes == InternalNode::size);
     }
     LeafNode* node = self.preallocated[self.used++];
     assert(node != null);
     return node;
 }
 
-fn void*? Preallocator.resize(&self, void* old_ptr, usz new_bytes, usz alignment) @dynamic @local
+fn void*? Preallocator.resize(&self, void* old_ptr, sz new_bytes, sz alignment) @dynamic
 {
     abort("Not supported");
 }
 
-fn void Preallocator.release(&self, void* old_ptr, bool aligned) @dynamic @local
+fn void Preallocator.release(&self, void* old_ptr, bool aligned) @dynamic
 {
     abort("Not supported");
 }
@@ -229,7 +229,7 @@ fn void Preallocator.release(&self, void* old_ptr, bool aligned) @dynamic @local
 // and B-tree won't be changed.
 macro BTreeSlot? BTree.@get_slot_try(&self, #compare, ...)
 {
-    SearchResult sr = self.root.@search_tree(#compare, $vasplat);
+    SearchResult sr = self.root.@search_tree(#compare, ...$vaarg);
 
     HandleItem handle;
     if (sr.found)
@@ -239,7 +239,7 @@ macro BTreeSlot? BTree.@get_slot_try(&self, #compare, ...)
     else
     {
         // Count how many new nodes need to be allocated.
-        usz number_of_new_nodes;
+        sz number_of_new_nodes;
         {
             LeafNode* node = sr.insert_position.node_ref.node;
             while (true)
@@ -267,7 +267,7 @@ macro BTreeSlot? BTree.@get_slot_try(&self, #compare, ...)
         else
         {
             // No allocations are needed.
-            handle = sr.insert_position.insert_into_leaf_recursing_up({}, &self.root, &allocator::NULL_ALLOCATOR);
+            handle = sr.insert_position.insert_into_leaf_recursing_up({}, &self.root, &allocators::NULL_ALLOCATOR);
         }
 
         self.number_of_items++;
@@ -279,7 +279,7 @@ macro BTreeSlot? BTree.@get_slot_try(&self, #compare, ...)
 
 macro bool BTree.@remove(&self, #compare, ...)
 {
-    SearchResult sr = self.root.@search_tree(#compare, $vasplat);
+    SearchResult sr = self.root.@search_tree(#compare, ...$vaarg);
 
     if (!sr.found)
     {
@@ -327,7 +327,7 @@ fn void BTree.free(&self)
                     },
                     .edge_idx = node_to_free.parent_edge_idx,
                 };
-                allocator::free(self.allocator, node_to_free);
+                alloc::free(self.allocator, node_to_free);
             }
 
             if (edge.edge_idx < edge.node_ref.node.len)
@@ -338,7 +338,7 @@ fn void BTree.free(&self)
             else
             {
                 // We walked the whole tree, we can free the root.
-                allocator::free(self.allocator, self.root.node);
+                alloc::free(self.allocator, self.root.node);
                 *self = {};  // Zero everything.
                 return;
             }
@@ -397,7 +397,7 @@ macro void BTree.@each(&self; @body(Type* item_from_tree))
     }
 }
 
-fn void? LeafNode.output_dot_node_id(&self, OutStream out) @local
+fn void? LeafNode.output_dot_node_id(&self, OutStream out)
 {
     if (!self.parent)
     {
@@ -417,16 +417,16 @@ fn void? LeafNode.output_dot_node_id(&self, OutStream out) @local
     }
 }
 
-macro void? NodeRef.@output_dot_node(self, #output_item, OutStream out, ...) @local
+macro void? NodeRef.@output_dot_node(self, #output_item, OutStream out, ...)
 {
-    usz width = self.height * 30 + 1;  // Higher node --> wider space for edges.
+    sz width = self.height * 30 + 1;  // Higher node --> wider space for edges.
     self.node.output_dot_node_id(out)!;
     io::fprint(out, "[label = < <TABLE BORDER=\"1\" CELLBORDER=\"1\" CELLSPACING=\"0\"><TR>")!;
     io::fprintf(out, "<TD PORT=\"e0\" WIDTH=\"%d\"></TD>", width)!;  // First edge.
     foreach (i, item : self.node.items[:self.node.len])
     {
         io::fprint(out, "<TD>")!;
-        #output_item(out, $vasplat, item)!;
+        #output_item(out, ...$vaarg, item)!;
         io::fprint(out, "</TD>")!;
         io::fprintf(out, "<TD PORT=\"e%d\" WIDTH=\"%d\"></TD>", i + 1, width)!; // Edge after `i`-th item.
     }
@@ -446,7 +446,7 @@ macro void? BTree.@to_dot(&self, #output_item, OutStream out, ...)
     io::fprintn(out, "node[shape = plaintext];")!;
 
     // Output root.
-    self.root.@output_dot_node(#output_item, out, $vasplat)!;
+    self.root.@output_dot_node(#output_item, out, ...$vaarg)!;
 
     HandleEdge edge = { .node_ref = self.root };
     while (true)
@@ -455,7 +455,7 @@ macro void? BTree.@to_dot(&self, #output_item, OutStream out, ...)
         if (edge.node_ref.height > 0)
         {
             InternalNode* internal_node = (InternalNode*)edge.node_ref.node;
-            usz edge_idx = edge.edge_idx;
+            sz edge_idx = edge.edge_idx;
 
             edge = {
                 .node_ref = {
@@ -471,7 +471,7 @@ macro void? BTree.@to_dot(&self, #output_item, OutStream out, ...)
             if (edge.node_ref.node.parent_edge_idx != edge_idx) abort("Inconsistent parent_edge_idx");
 
             // Output node the first time we reach it from its parent.
-            edge.node_ref.@output_dot_node(#output_item, out, $vasplat)!;
+            edge.node_ref.@output_dot_node(#output_item, out, ...$vaarg)!;
 
             // Output parent edge which we just used to reached the node.
             internal_node.data.output_dot_node_id(out)!;  // Parent node.
@@ -527,7 +527,7 @@ fn void BTree.check_invariants(&self)
         if (edge.node_ref.height > 0)
         {
             InternalNode* internal_node = (InternalNode*)edge.node_ref.node;
-            usz edge_idx = edge.edge_idx;
+            sz edge_idx = edge.edge_idx;
 
             edge = {
                 .node_ref = {
