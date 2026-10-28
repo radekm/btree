@@ -167,7 +167,7 @@ fn void OrderBook.add_order_to_by_priority_index(&self, OrderHandle handle)
     }
 
     if (slot.existed) abort("Order already exists in by priority index");
-    *slot.item = handle;
+    slot.set(handle);
 }
 
 fn void OrderBook.remove_order_from_by_priority_index(&self, Order* order)
@@ -207,7 +207,7 @@ fn void OrderBook.add_or_update_order(&self, Order order)
     Order* order_slot;  // Slot in the pool.
     if (slot.existed)
     {
-        handle = *slot.item;
+        handle = slot.get();
         order_slot = self.orders.get_ref(handle);
         // For simplicity we always reinsert order into a priority index.
         // More optimized solution would first check whether at least one
@@ -217,7 +217,7 @@ fn void OrderBook.add_or_update_order(&self, Order order)
     else
     {
         handle = self.orders.add();
-        *slot.item = handle;
+        slot.set(handle);
         order_slot = self.orders.get_ref(handle);
     }
 

@@ -73,7 +73,7 @@ macro void parametric_test(bool $prealloc, sz number_of_items_to_insert, sz min_
         // Only insert if the number wans't there before.
         if (!slot.existed)
         {
-            *slot.item = new;
+            slot.set(new);
             inserted++;
         }
     }
@@ -94,7 +94,7 @@ macro void parametric_test(bool $prealloc, sz number_of_items_to_insert, sz min_
         slot = btree.@get_existing_slot(compare_uints, number);
 
         assert(slot.existed);
-        assert(*slot.item == number);
+        assert(slot.get() == number);
     }
 
     // Delete numbers.

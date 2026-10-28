@@ -17,7 +17,7 @@ fn void main()
     for (int i = 1; i <= 50_000_000; i++)
     {
         BTreeSlot{int} slot = set.@get_slot(&compare_int, i);
-        *slot.item = i;
+        slot.set(i);
     }
 
     io::printfn("After insertion: %d", set.number_of_items);

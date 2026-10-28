@@ -86,7 +86,7 @@ fn void parametric_test_oom(sz number_of_items_to_insert, sz min_expected_height
         // Only insert if the number wans't there before.
         if (!slot.existed)
         {
-            *slot.item = new;
+            slot.set(new);
             inserted++;
         }
     }

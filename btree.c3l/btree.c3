@@ -119,7 +119,20 @@ fn void? BTree.init_try(&self, Allocator allocator)
 struct BTreeSlot
 {
     bool existed;
-    Type* item;
+    // Valid if the item existed or if it was created.
+    HandleItem handle;
+    // Non-null if the item existed or if it was created.
+    // For removal we need both allocator and root.
+    BTree* tree;
+}
+
+fn Type* BTreeSlot.get_ref(&self) @inline => &self.handle.node_ref.node.items[self.handle.item_idx];
+fn Type  BTreeSlot.get(&self) @inline => *self.get_ref();
+fn void  BTreeSlot.set(&self, Type item) @inline => *self.get_ref() = item;
+// Slot must not be used after calling `remove`.
+fn void  BTreeSlot.remove(&self) @inline
+{
+    self.handle.remove_item(&self.tree.root, self.tree.allocator);
 }
 
 // CONSIDER: Return `Type*?` instead?
@@ -134,7 +147,7 @@ macro BTreeSlot BTree.@get_existing_slot(&self, #compare, ...)
     else
     {
         LeafNode* node = sr.existing_item.node_ref.node;
-        return { .existed = true, .item = &node.items[sr.existing_item.item_idx] };
+        return { .existed = true, .handle = sr.existing_item, .tree = self };
     }
 }
 
@@ -155,7 +168,7 @@ macro BTreeSlot BTree.@get_slot(&self, #compare, ...)
     }
 
     LeafNode* node = handle.node_ref.node;
-    return { .existed = sr.found, .item = &node.items[handle.item_idx] };
+    return { .existed = sr.found, .handle = handle, .tree = self };
 }
 
 struct Preallocator (Allocator) @local
@@ -273,8 +286,7 @@ macro BTreeSlot? BTree.@get_slot_try(&self, #compare, ...)
         self.number_of_items++;
     }
 
-    LeafNode* node = handle.node_ref.node;
-    return { .existed = sr.found, .item = &node.items[handle.item_idx] };
+    return { .existed = sr.found, .handle = handle, .tree = self };
 }
 
 macro bool BTree.@remove(&self, #compare, ...)

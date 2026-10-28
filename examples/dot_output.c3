@@ -19,7 +19,7 @@ fn void main()
         int elem = i * 10;
         BTreeSlot{int} slot;
         slot = btree.@get_slot(compare_ints, elem);
-        *slot.item = elem;
+        slot.set(elem);
     }
     // Insert items between existing items.
     for (int i = 0; i < 2000; i++)
@@ -27,7 +27,7 @@ fn void main()
         int elem = i;
         BTreeSlot{int} slot;
         slot = btree.@get_slot(compare_ints, elem);
-        *slot.item = elem;
+        slot.set(elem);
     }
 
     btree.@to_dot(
