@@ -176,6 +176,7 @@ fn bool BTreeSlot.next(&self)
     }
 
     // We walked the whole tree.
+    *self = {};
     return false;
 }
 
@@ -187,13 +188,14 @@ fn bool BTreeSlot.prev(&self)
     while (edge.node_ref.height > 0)
     {
         InternalNode* internal_node = (InternalNode*)edge.node_ref.node;
+        LeafNode* child = internal_node.edges[edge.edge_idx];
         // Rightmost edge.
         edge = {
             .node_ref = {
                 .height = edge.node_ref.height - 1,
-                .node = internal_node.edges[edge.edge_idx],
+                .node = child,
             },
-            .edge_idx = edge.node_ref.node.len,
+            .edge_idx = child.len,
         };
     }
 
@@ -219,6 +221,7 @@ fn bool BTreeSlot.prev(&self)
     }
 
     // We walked the whole tree.
+    *self = {};
     return false;
 }
 
