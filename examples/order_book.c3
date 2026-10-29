@@ -244,15 +244,14 @@ fn void OrderBook.remove_order(&self, OrderId order_id)
     self.orders.remove(handle);
 }
 
-fn Maybe{long} OrderBook.spread(&self)
+fn long? OrderBook.spread(&self)
 {
-    Maybe{OrderHandle} best_bid = self.bid_by_priority.first_item();
-    Maybe{OrderHandle} best_ask = self.ask_by_priority.first_item();
+    OrderHandle best_bid = self.bid_by_priority.first_item()!;
+    OrderHandle best_ask = self.ask_by_priority.first_item()!;
 
-    if (!best_bid.has_value || !best_ask.has_value) return {};
-    Order* bid = self.orders.get_ref(best_bid.value);
-    Order* ask = self.orders.get_ref(best_ask.value);
-    return maybe::value{long}(ask.price - bid.price);
+    Order* bid = self.orders.get_ref(best_bid);
+    Order* ask = self.orders.get_ref(best_ask);
+    return ask.price - bid.price;
 }
 
 fn void print_tree(BTree{OrderHandle}* btree, Pool{Order}* pool)
@@ -296,7 +295,7 @@ fn void main()
     print_tree(&ob.orders_by_id, &ob.orders);
     print_tree(&ob.bid_by_priority, &ob.orders);
     print_tree(&ob.ask_by_priority, &ob.orders);
-    assert(ob.spread().value == 3);
+    assert(ob.spread()!! == 3);
 
     // Order 1 improves price to jump over order 2.
     ob.add_or_update_order({
@@ -307,17 +306,17 @@ fn void main()
         .side = BID,
     });
 
-    assert(ob.spread().value == 2);
+    assert(ob.spread()!! == 2);
 
     // Remove best bid.
     ob.remove_order((OrderId)1);
 
-    assert(ob.spread().value == 3);
+    assert(ob.spread()!! == 3);
 
     // Remove remaining bid.
     ob.remove_order((OrderId)2);
 
-    assert(!ob.spread().has_value);
+    assert(@catch(ob.spread()) == NOT_FOUND);
     assert(ob.orders_by_id.number_of_items == 1);
     assert(ob.bid_by_priority.number_of_items == 0);
     assert(ob.ask_by_priority.number_of_items == 1);

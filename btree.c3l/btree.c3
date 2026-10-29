@@ -225,7 +225,12 @@ fn bool BTreeSlot.prev(&self)
     return false;
 }
 
-// CONSIDER: Return `Type*?` or `BTreeSlot?` instead?
+// TODO: Add:
+//       fn bool BTreeSlot.remove_and_go_to_next(&self)
+//       fn bool BTreeSlot.remove_and_go_to_prev(&self)
+//
+//       Both functions return whether there was some next or some prev item.
+
 macro BTreeSlot BTree.@get_existing_slot(&self, #compare, ...)
 {
     SearchResult sr = self.root.@search_tree(#compare, ...$vaarg);
@@ -700,14 +705,17 @@ fn BTreeSlot{Type} BTree.first_slot(&self)
     };
 }
 
-// CONSIDER: Returning `Type?`.
-fn Maybe{Type} BTree.first_item(&self)
+fn Type? BTree.first_item(&self)
 {
     BTreeSlot{Type} slot = self.first_slot();
-    if (!slot.has_item()) return {};
+    if (!slot.has_item()) return NOT_FOUND~;
 
-    return maybe::value{Type}(slot.get());
+    return slot.get();
 }
+
+// TODO: Add:
+//       fn BTreeSlot{Type} BTree.last_slot(&self)
+//       fn Type? BTree.last_item(&self)
 
 // TODO:
 // macro void Map.@remove_if(&self, ???)
