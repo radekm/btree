@@ -20,6 +20,32 @@ fn void? Trash.write_byte(&self, char c) @dynamic
 {
 }
 
+fn void BTree{uint}.check_iteration_via_slot_api(&self)
+{
+    BTreeSlot{uint} slot = self.first_slot();
+
+    self.@each(; uint* item_from_tree)
+    {
+        assert(slot.has_item());
+        assert(slot.get() == *item_from_tree);
+        assert(slot.existed);
+        assert(slot.tree);
+        if (slot.next())
+        {
+            assert(slot.prev());  // Reverse iteration must work too.
+            assert(slot.get() == *item_from_tree);
+            assert(slot.next());
+        }
+    };
+
+    assert(!slot.has_item());
+    assert(!slot.existed);
+    assert(!slot.handle.node_ref.height);
+    assert(!slot.handle.node_ref.node);
+    assert(!slot.handle.item_idx);
+    assert(!slot.tree);
+}
+
 fn void BTree{uint}.check_invariants_and_orderding(&self, sz expected_number_of_items)
 {
     // Check invariants.
@@ -82,6 +108,7 @@ macro void parametric_test(bool $prealloc, sz number_of_items_to_insert, sz min_
 
     assert(btree.root.height >= min_expected_height);
     btree.check_invariants_and_orderding(inserted);
+    btree.check_iteration_via_slot_api();
 
     // Check that all numbers are in tree.
     Sfc64Random r2;
@@ -113,6 +140,7 @@ macro void parametric_test(bool $prealloc, sz number_of_items_to_insert, sz min_
         if (generated / 100 > 0 && i % (generated / 100) == 0)
         {
             btree.check_invariants_and_orderding(inserted - deleted);
+            btree.check_iteration_via_slot_api();
         }
     }
 
@@ -120,6 +148,7 @@ macro void parametric_test(bool $prealloc, sz number_of_items_to_insert, sz min_
     assert(deleted == inserted);
     assert(btree.root.height == 0);
     btree.check_invariants_and_orderding(0);
+    btree.check_iteration_via_slot_api();
 }
 
 fn void test_small() @test

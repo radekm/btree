@@ -126,16 +126,103 @@ struct BTreeSlot
     BTree* tree;
 }
 
-fn Type* BTreeSlot.get_ref(&self) @inline => &self.handle.node_ref.node.items[self.handle.item_idx];
-fn Type  BTreeSlot.get(&self) @inline => *self.get_ref();
-fn void  BTreeSlot.set(&self, Type item) @inline => *self.get_ref() = item;
+fn bool BTreeSlot.has_item(self) @inline => (bool)self.tree;
+fn Type* BTreeSlot.get_ref(self) @inline => &self.handle.node_ref.node.items[self.handle.item_idx];
+fn Type BTreeSlot.get(self) @inline => *self.get_ref();
+fn void BTreeSlot.set(self, Type item) @inline => *self.get_ref() = item;
 // Slot must not be used after calling `remove`.
-fn void  BTreeSlot.remove(&self) @inline
+fn void BTreeSlot.remove(&self) @inline
 {
     self.handle.remove_item(&self.tree.root, self.tree.allocator);
+    *self = {};
 }
 
-// CONSIDER: Return `Type*?` instead?
+fn bool BTreeSlot.next(&self)
+{
+    // Edge on the right of the value pointed by `self.handle`.
+    HandleEdge edge = { .node_ref = self.handle.node_ref, .edge_idx = self.handle.item_idx + 1 };
+    // Go to the leaf.
+    while (edge.node_ref.height > 0)
+    {
+        InternalNode* internal_node = (InternalNode*)edge.node_ref.node;
+        // Leftmost edge.
+        edge = {
+            .node_ref = {
+                .height = edge.node_ref.height - 1,
+                .node = internal_node.edges[edge.edge_idx],
+            },
+        };
+    }
+
+    // While it's not possible to go right, go up.
+    while (edge.edge_idx >= edge.node_ref.node.len && edge.node_ref.node.parent)
+    {
+        edge = {
+            .node_ref = {
+                .height = edge.node_ref.height + 1,
+                .node = &edge.node_ref.node.parent.data,
+            },
+            .edge_idx = edge.node_ref.node.parent_edge_idx,
+        };
+    }
+
+    if (edge.edge_idx < edge.node_ref.node.len)
+    {
+        // It's possible to go right.
+        // There's an item on the right of `edge`.
+        self.existed = true;
+        self.handle = { .node_ref = edge.node_ref, .item_idx = edge.edge_idx };
+        return true;
+    }
+
+    // We walked the whole tree.
+    return false;
+}
+
+fn bool BTreeSlot.prev(&self)
+{
+    // Edge on the left of the value pointed by `self.handle`.
+    HandleEdge edge = { .node_ref = self.handle.node_ref, .edge_idx = self.handle.item_idx };
+    // Go to the leaf.
+    while (edge.node_ref.height > 0)
+    {
+        InternalNode* internal_node = (InternalNode*)edge.node_ref.node;
+        // Rightmost edge.
+        edge = {
+            .node_ref = {
+                .height = edge.node_ref.height - 1,
+                .node = internal_node.edges[edge.edge_idx],
+            },
+            .edge_idx = edge.node_ref.node.len,
+        };
+    }
+
+    // While it's not possible to go left, go up.
+    while (edge.edge_idx == 0 && edge.node_ref.node.parent)
+    {
+        edge = {
+            .node_ref = {
+                .height = edge.node_ref.height + 1,
+                .node = &edge.node_ref.node.parent.data,
+            },
+            .edge_idx = edge.node_ref.node.parent_edge_idx,
+        };
+    }
+
+    if (edge.edge_idx > 0)
+    {
+        // It's possible to go left.
+        // There's an item on the left of `edge`.
+        self.existed = true;
+        self.handle = { .node_ref = edge.node_ref, .item_idx = edge.edge_idx - 1 };
+        return true;
+    }
+
+    // We walked the whole tree.
+    return false;
+}
+
+// CONSIDER: Return `Type*?` or `BTreeSlot?` instead?
 macro BTreeSlot BTree.@get_existing_slot(&self, #compare, ...)
 {
     SearchResult sr = self.root.@search_tree(#compare, ...$vaarg);
@@ -585,7 +672,7 @@ fn void BTree.check_invariants(&self)
     }
 }
 
-fn Maybe{Type} BTree.first_item(&self)
+fn BTreeSlot{Type} BTree.first_slot(&self)
 {
     if (!self.number_of_items) return {};
 
@@ -599,7 +686,24 @@ fn Maybe{Type} BTree.first_item(&self)
             .node = internal_node.edges[0],
         };
     }
-    return maybe::value{Type}(node_ref.node.items[0]);
+
+    return {
+        .existed = true,
+        .handle = {
+            .node_ref = node_ref,
+            .item_idx = 0,
+        },
+        .tree = self,
+    };
+}
+
+// CONSIDER: Returning `Type?`.
+fn Maybe{Type} BTree.first_item(&self)
+{
+    BTreeSlot{Type} slot = self.first_slot();
+    if (!slot.has_item()) return {};
+
+    return maybe::value{Type}(slot.get());
 }
 
 // TODO:
