@@ -101,7 +101,7 @@ macro void parametric_test(bool $prealloc, sz number_of_items_to_insert, sz min_
             slot = btree.@get_slot(compare_uints, new);
         $endif
 
-        // Only insert if the number wans't there before.
+        // Only insert if the number wasn't there before.
         if (!slot.existed)
         {
             slot.set(new);
@@ -213,3 +213,111 @@ fn void test_bigger() @test
 //     // items can fit into tree with 8 levels. Having one more item guarantees at least 9 levels.
 //     parametric_test(false, 429_981_696, 8);
 // }
+
+macro void @parametric_test_for_remove_if(sz number_of_items_to_insert)
+{
+    BTree{uint} btree;
+    btree.init(mem);
+    defer btree.free();
+
+    char[8 * 4] entropy = random::entropy();
+    Sfc64Random r;
+    r.set_seed(&entropy);
+    sz generated;
+    sz inserted;
+
+    sz inserted_odd;
+    while (inserted < number_of_items_to_insert)
+    {
+        uint new = r.next_int();
+        generated++;
+
+        BTreeSlot{uint} slot = btree.@get_slot(compare_uints, new);
+
+        // Only insert if the number wans't there before.
+        if (!slot.existed)
+        {
+            slot.set(new);
+            inserted++;
+            if (new % 2 == 1) inserted_odd++;
+        }
+    }
+
+    io::printfn("Generated %d, inserted %d", generated, inserted);
+
+    btree.check_invariants_and_orderding(inserted);
+    btree.check_iteration_via_slot_api();
+
+    // Delete even numbers.
+    {
+        Maybe{uint} last;
+        btree.@remove_if(; uint* item_from_tree, bool* remove)
+        {
+            if (last.has_value)
+            {
+                assert(last.value < *item_from_tree);
+            }
+            last.set(*item_from_tree);
+
+            *remove = *item_from_tree % 2 == 0;
+        };
+    }
+
+    // Check tree.
+    btree.check_invariants_and_orderding(inserted_odd);
+    btree.check_iteration_via_slot_api();
+
+    // Check that all odd numbers are in tree and even numbers aren't.
+    Sfc64Random r2;
+    r2.set_seed(&entropy);
+    for (int i; i < generated; i++)
+    {
+        uint number = r2.next_int();
+
+        BTreeSlot{uint} slot;
+        slot = btree.@get_existing_slot(compare_uints, number);
+
+        if (number % 2 == 0)
+        {
+            assert(!slot.existed);
+            assert(!slot.has_item());
+        }
+        else
+        {
+            assert(slot.existed);
+            assert(slot.has_item());
+            assert(slot.get() == number);
+        }
+    }
+
+    // Delete odd numbers.
+    {
+        Maybe{uint} last;
+        btree.@remove_if(; uint* item_from_tree, bool* remove)
+        {
+            if (last.has_value)
+            {
+                assert(last.value < *item_from_tree);
+            }
+            last.set(*item_from_tree);
+
+            *remove = *item_from_tree % 2 == 1;
+        };
+    }
+
+    // Check empty tree.
+    assert(btree.root.height == 0);
+    btree.check_invariants_and_orderding(0);
+    btree.check_iteration_via_slot_api();
+}
+
+fn void test_remove_if_small() @test
+{
+    // We want to create tree with at least 5 levels (height 4).
+    // 20735 (= 12^0 * 11 + 12^1 * 11 + 12^2 * 11 + 12^3 * 11)
+    // items can fit into tree with 4 levels. Having one more item guarantees at least 5 levels.
+    for (int i; i < 100; i++)
+    {
+        @parametric_test_for_remove_if(20736);
+    }
+}

@@ -134,44 +134,15 @@ fn void BTreeSlot.set(self, Type item) @inline => *self.get_ref() = item;
 fn void BTreeSlot.remove(&self) @inline
 {
     self.handle.remove_item(&self.tree.root, self.tree.allocator);
+    self.tree.number_of_items--;
     *self = {};
 }
 
 fn bool BTreeSlot.next(&self)
 {
-    // Edge on the right of the value pointed by `self.handle`.
-    HandleEdge edge = { .node_ref = self.handle.node_ref, .edge_idx = self.handle.item_idx + 1 };
-    // Go to the leaf.
-    while (edge.node_ref.height > 0)
+    if (handle_item_next_item(self.handle, &self.handle))
     {
-        InternalNode* internal_node = (InternalNode*)edge.node_ref.node;
-        // Leftmost edge.
-        edge = {
-            .node_ref = {
-                .height = edge.node_ref.height - 1,
-                .node = internal_node.edges[edge.edge_idx],
-            },
-        };
-    }
-
-    // While it's not possible to go right, go up.
-    while (edge.edge_idx >= edge.node_ref.node.len && edge.node_ref.node.parent)
-    {
-        edge = {
-            .node_ref = {
-                .height = edge.node_ref.height + 1,
-                .node = &edge.node_ref.node.parent.data,
-            },
-            .edge_idx = edge.node_ref.node.parent_edge_idx,
-        };
-    }
-
-    if (edge.edge_idx < edge.node_ref.node.len)
-    {
-        // It's possible to go right.
-        // There's an item on the right of `edge`.
         self.existed = true;
-        self.handle = { .node_ref = edge.node_ref, .item_idx = edge.edge_idx };
         return true;
     }
 
@@ -182,41 +153,9 @@ fn bool BTreeSlot.next(&self)
 
 fn bool BTreeSlot.prev(&self)
 {
-    // Edge on the left of the value pointed by `self.handle`.
-    HandleEdge edge = { .node_ref = self.handle.node_ref, .edge_idx = self.handle.item_idx };
-    // Go to the leaf.
-    while (edge.node_ref.height > 0)
+    if (handle_item_prev_item(self.handle, &self.handle))
     {
-        InternalNode* internal_node = (InternalNode*)edge.node_ref.node;
-        LeafNode* child = internal_node.edges[edge.edge_idx];
-        // Rightmost edge.
-        edge = {
-            .node_ref = {
-                .height = edge.node_ref.height - 1,
-                .node = child,
-            },
-            .edge_idx = child.len,
-        };
-    }
-
-    // While it's not possible to go left, go up.
-    while (edge.edge_idx == 0 && edge.node_ref.node.parent)
-    {
-        edge = {
-            .node_ref = {
-                .height = edge.node_ref.height + 1,
-                .node = &edge.node_ref.node.parent.data,
-            },
-            .edge_idx = edge.node_ref.node.parent_edge_idx,
-        };
-    }
-
-    if (edge.edge_idx > 0)
-    {
-        // It's possible to go left.
-        // There's an item on the left of `edge`.
         self.existed = true;
-        self.handle = { .node_ref = edge.node_ref, .item_idx = edge.edge_idx - 1 };
         return true;
     }
 
@@ -225,11 +164,68 @@ fn bool BTreeSlot.prev(&self)
     return false;
 }
 
-// TODO: Add:
-//       fn bool BTreeSlot.remove_and_go_to_next(&self)
-//       fn bool BTreeSlot.remove_and_go_to_prev(&self)
-//
-//       Both functions return whether there was some next or some prev item.
+fn bool BTreeSlot.remove_and_go_to_next(&self)
+{
+    NodeRef* orig_root = &self.tree.root;
+    Allocator allocator = self.tree.allocator;
+    bool found_next;
+    if (self.handle.node_ref.height == 0)
+    {
+        found_next = handle_edge_in_leaf_next_item(self.handle.remove_leaf_item(orig_root, allocator), &self.handle);
+    }
+    else
+    {
+        HandleItem predecessor;
+        bool ok = true;
+        ok &= handle_edge_in_leaf_next_item(self.handle.remove_internal_item(orig_root, allocator), &predecessor);
+        ok &= handle_item_next_item(predecessor, &self.handle);
+        // We were removing internal node. Every item in an internal node has both a predecessor and a successor,
+        // so both `ok` and `found_next` must be true.
+        assert(ok);
+        found_next = true;
+    }
+
+    self.tree.number_of_items--;
+    if (found_next)
+    {
+        self.existed = true;
+    }
+    else
+    {
+        *self = {};
+    }
+    return found_next;
+}
+
+fn bool BTreeSlot.remove_and_go_to_prev(&self)
+{
+    NodeRef* orig_root = &self.tree.root;
+    Allocator allocator = self.tree.allocator;
+    bool found_prev;
+    if (self.handle.node_ref.height == 0)
+    {
+        found_prev = handle_edge_in_leaf_prev_item(self.handle.remove_leaf_item(orig_root, allocator), &self.handle);
+    }
+    else
+    {
+        bool ok = handle_edge_in_leaf_next_item(self.handle.remove_internal_item(orig_root, allocator), &self.handle);
+        // We were removing internal node. Every item in an internal node has both a predecessor and a successor,
+        // so `ok` and `found_prev` must be true.
+        assert(ok);
+        found_prev = true;
+    }
+
+    self.tree.number_of_items--;
+    if (found_prev)
+    {
+        self.existed = true;
+    }
+    else
+    {
+        *self = {};
+    }
+    return found_prev;
+}
 
 macro BTreeSlot BTree.@get_existing_slot(&self, #compare, ...)
 {
@@ -746,6 +742,20 @@ fn Type? BTree.last_item(&self)
     return slot.get();
 }
 
-// TODO:
-// macro void Map.@remove_if(&self, ???)
-// It could be same as @get_existing_slots but @body can return whether to remove or not.
+macro void BTree.@remove_if(&self; @body(Type* item_from_tree, bool* remove))
+{
+    BTreeSlot slot = self.first_slot();
+    while (slot.has_item())
+    {
+        bool remove;
+        @body(slot.get_ref(), &remove);
+        if (remove)
+        {
+            slot.remove_and_go_to_next();
+        }
+        else
+        {
+            slot.next();
+        }
+    }
+}
