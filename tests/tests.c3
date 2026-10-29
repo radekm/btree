@@ -36,6 +36,11 @@ fn void BTree{uint}.check_iteration_via_slot_api(&self)
             assert(slot.get() == *item_from_tree);
             assert(slot.next());
         }
+        else
+        {
+            // No next slot means `item_from_tree` is the last item.
+            assert(self.last_item()!! == *item_from_tree);
+        }
     };
 
     assert(!slot.has_item());

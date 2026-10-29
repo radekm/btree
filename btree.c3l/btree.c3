@@ -680,7 +680,7 @@ fn void BTree.check_invariants(&self)
     }
 }
 
-fn BTreeSlot{Type} BTree.first_slot(&self)
+fn BTreeSlot BTree.first_slot(&self)
 {
     if (!self.number_of_items) return {};
 
@@ -707,15 +707,44 @@ fn BTreeSlot{Type} BTree.first_slot(&self)
 
 fn Type? BTree.first_item(&self)
 {
-    BTreeSlot{Type} slot = self.first_slot();
+    BTreeSlot slot = self.first_slot();
     if (!slot.has_item()) return NOT_FOUND~;
 
     return slot.get();
 }
 
-// TODO: Add:
-//       fn BTreeSlot{Type} BTree.last_slot(&self)
-//       fn Type? BTree.last_item(&self)
+fn BTreeSlot BTree.last_slot(&self)
+{
+    if (!self.number_of_items) return {};
+
+    NodeRef node_ref = self.root;
+    while (node_ref.height > 0)
+    {
+        InternalNode* internal_node = (InternalNode*)node_ref.node;
+        // Use the rightmost edge to go down.
+        node_ref = {
+            .height = node_ref.height - 1,
+            .node = internal_node.edges[internal_node.data.len],
+        };
+    }
+
+    return {
+        .existed = true,
+        .handle = {
+            .node_ref = node_ref,
+            .item_idx = (sz)node_ref.node.len - 1,
+        },
+        .tree = self,
+    };
+}
+
+fn Type? BTree.last_item(&self)
+{
+    BTreeSlot slot = self.last_slot();
+    if (!slot.has_item()) return NOT_FOUND~;
+
+    return slot.get();
+}
 
 // TODO:
 // macro void Map.@remove_if(&self, ???)
