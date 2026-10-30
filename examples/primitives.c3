@@ -23,6 +23,7 @@ fn void main()
 {
     BTree{Item} btree;
     btree.init(mem);
+    defer btree.free();
 
     BTreeSlot{Item} slot;
     slot = btree.@get_or_create_slot(fn int(Item item_from_tree) => compare_strings("nose", item_from_tree.k));
