@@ -358,37 +358,43 @@ macro void @parametric_test_remove_and_go(bool $go_to_next, sz number_of_items_t
 
     quicksort(&inserted);
 
+    sz idx;
+    BTreeSlot{uint} slot;
     while (inserted.len() > 0)
     {
-        sz idx = random::next(&r, (int)inserted.len());
-        BTreeSlot{uint} slot = btree.@get_existing_slot(compare_uints, inserted[idx]);
+        // In 10 % of cases we continue with a new slot.
+        if (!slot.has_item() || random::next(&r, 4) == 0)
+        {
+            idx = random::next(&r, (int)inserted.len());
+            slot = btree.@get_existing_slot(compare_uints, inserted[idx]);
+        }
         assert(slot.existed);
         assert(slot.has_item());
         assert(slot.get() == inserted[idx]);
+        inserted.remove_at(idx);
         $if $go_to_next:
-            bool another_item = slot.remove_and_go_to_next();
-            sz another_idx = idx + 1;
+            bool has_another_item = slot.remove_and_go_to_next();
+            // `idx` points to next automatically.
         $else
-            bool another_item = slot.remove_and_go_to_prev();
-            sz another_idx = idx - 1;
+            bool has_another_item = slot.remove_and_go_to_prev();
+            idx--;
         $endif
-        if (another_item)
+        if (has_another_item)
         {
             assert(slot.existed);
             assert(slot.has_item());
-            assert(slot.get() == inserted[another_idx]);
+            assert(slot.get() == inserted[idx]);
         }
         else
         {
             assert(!slot.existed);
             assert(!slot.has_item());
             $if $go_to_next:
-                assert(another_idx == inserted.len());
+                assert(idx == inserted.len());
             $else
-                assert(another_idx == -1);
+                assert(idx == -1);
             $endif
         }
-        inserted.remove_at(idx);
     }
 
     // Check empty tree.
