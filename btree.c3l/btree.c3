@@ -116,12 +116,14 @@ fn void? BTree.init_try(&self, Allocator allocator)
     };
 }
 
+// Slot points to an item in the tree or is empty (`has_item()` returns false).
+// Any modification of the tree (insertion or removal) invalidates all slots
+// except the one which was used to perform the modification.
 struct BTreeSlot
 {
-    bool existed;
-    // Valid if the item existed or if it was created.
+    // Valid if the slot is not empty.
     HandleItem handle;
-    // Non-null if the item existed or if it was created.
+    // Non-null if the slot is not empty.
     // For removal we need both allocator and root.
     BTree* tree;
 }
@@ -140,11 +142,7 @@ fn void BTreeSlot.remove(&self) @inline
 
 fn bool BTreeSlot.next(&self)
 {
-    if (handle_item_next_item(self.handle, &self.handle))
-    {
-        self.existed = true;
-        return true;
-    }
+    if (handle_item_next_item(self.handle, &self.handle)) return true;
 
     // We walked the whole tree.
     *self = {};
@@ -153,11 +151,7 @@ fn bool BTreeSlot.next(&self)
 
 fn bool BTreeSlot.prev(&self)
 {
-    if (handle_item_prev_item(self.handle, &self.handle))
-    {
-        self.existed = true;
-        return true;
-    }
+    if (handle_item_prev_item(self.handle, &self.handle)) return true;
 
     // We walked the whole tree.
     *self = {};
@@ -186,14 +180,7 @@ fn bool BTreeSlot.remove_and_go_to_next(&self)
     }
 
     self.tree.number_of_items--;
-    if (found_next)
-    {
-        self.existed = true;
-    }
-    else
-    {
-        *self = {};
-    }
+    if (!found_next) *self = {};
     return found_next;
 }
 
@@ -216,18 +203,12 @@ fn bool BTreeSlot.remove_and_go_to_prev(&self)
     }
 
     self.tree.number_of_items--;
-    if (found_prev)
-    {
-        self.existed = true;
-    }
-    else
-    {
-        *self = {};
-    }
+    if (!found_prev) *self = {};
     return found_prev;
 }
 
-macro BTreeSlot BTree.@get_existing_slot(&self, #compare, ...)
+// Finds an existing item. If the item is not found then the returned slot is empty.
+macro BTreeSlot BTree.@get_slot(&self, #compare, ...)
 {
     SearchResult sr = self.root.@search_tree(#compare, ...$vaarg);
 
@@ -237,13 +218,20 @@ macro BTreeSlot BTree.@get_existing_slot(&self, #compare, ...)
     }
     else
     {
-        LeafNode* node = sr.existing_item.node_ref.node;
-        return { .existed = true, .handle = sr.existing_item, .tree = self };
+        return { .handle = sr.existing_item, .tree = self };
     }
 }
 
-// If there's not enough memory this function will panic and it may break B-tree.
-macro BTreeSlot BTree.@get_slot(&self, #compare, ...)
+// Finds an existing item or creates a new one. The returned slot is never empty.
+// The new item is zeroed and the caller must immediately set it (via `set` or `get_ref`)
+// to a value which is equal to the searched one (ie. `#compare` returns zero for it).
+//
+// If `created` is non-null then `*created` is set to true if a new item was created
+// and to false if the item already existed. Since `created` follows variadic arguments
+// it must be passed by name: `tree.@get_or_create_slot(cmp, key, created: &created)`.
+//
+// If there's not enough memory this function will panic.
+macro BTreeSlot BTree.@get_or_create_slot(&self, #compare, ..., bool* created = null)
 {
     SearchResult sr = self.root.@search_tree(#compare, ...$vaarg);
 
@@ -258,8 +246,8 @@ macro BTreeSlot BTree.@get_slot(&self, #compare, ...)
         self.number_of_items++;
     }
 
-    LeafNode* node = handle.node_ref.node;
-    return { .existed = sr.found, .handle = handle, .tree = self };
+    if (created) *created = !sr.found;
+    return { .handle = handle, .tree = self };
 }
 
 struct Preallocator (Allocator) @local
@@ -329,9 +317,10 @@ fn void Preallocator.release(&self, void* old_ptr, bool aligned) @dynamic
     abort("Not supported");
 }
 
-// If there is not enough memory this function will return `mem::OUT_OF_MEMORY`
-// and B-tree won't be changed.
-macro BTreeSlot? BTree.@get_slot_try(&self, #compare, ...)
+// Same as `@get_or_create_slot` but if there is not enough memory
+// this function will return `mem::OUT_OF_MEMORY` and B-tree won't be changed
+// (`*created` won't be changed either).
+macro BTreeSlot? BTree.@get_or_create_slot_try(&self, #compare, ..., bool* created = null)
 {
     SearchResult sr = self.root.@search_tree(#compare, ...$vaarg);
 
@@ -377,7 +366,8 @@ macro BTreeSlot? BTree.@get_slot_try(&self, #compare, ...)
         self.number_of_items++;
     }
 
-    return { .existed = sr.found, .handle = handle, .tree = self };
+    if (created) *created = !sr.found;
+    return { .handle = handle, .tree = self };
 }
 
 macro bool BTree.@remove(&self, #compare, ...)
@@ -692,7 +682,6 @@ fn BTreeSlot BTree.first_slot(&self)
     }
 
     return {
-        .existed = true,
         .handle = {
             .node_ref = node_ref,
             .item_idx = 0,
@@ -725,7 +714,6 @@ fn BTreeSlot BTree.last_slot(&self)
     }
 
     return {
-        .existed = true,
         .handle = {
             .node_ref = node_ref,
             .item_idx = (sz)node_ref.node.len - 1,

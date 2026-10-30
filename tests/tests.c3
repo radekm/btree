@@ -28,7 +28,6 @@ fn void BTree{uint}.check_iteration_via_slot_api(&self)
     {
         assert(slot.has_item());
         assert(slot.get() == *item_from_tree);
-        assert(slot.existed);
         assert(slot.tree);
         if (slot.next())
         {
@@ -44,7 +43,6 @@ fn void BTree{uint}.check_iteration_via_slot_api(&self)
     };
 
     assert(!slot.has_item());
-    assert(!slot.existed);
     assert(!slot.handle.node_ref.height);
     assert(!slot.handle.node_ref.node);
     assert(!slot.handle.item_idx);
@@ -95,14 +93,15 @@ macro void parametric_test(bool $prealloc, sz number_of_items_to_insert, sz min_
         generated++;
 
         BTreeSlot{uint} slot;
+        bool created;
         $if $prealloc:
-            slot = btree.@get_slot_try(compare_uints, new)!!;
+            slot = btree.@get_or_create_slot_try(compare_uints, new, created: &created)!!;
         $else
-            slot = btree.@get_slot(compare_uints, new);
+            slot = btree.@get_or_create_slot(compare_uints, new, created: &created);
         $endif
 
         // Only insert if the number wasn't there before.
-        if (!slot.existed)
+        if (created)
         {
             slot.set(new);
             inserted++;
@@ -123,9 +122,9 @@ macro void parametric_test(bool $prealloc, sz number_of_items_to_insert, sz min_
         uint number = r2.next_int();
 
         BTreeSlot{uint} slot;
-        slot = btree.@get_existing_slot(compare_uints, number);
+        slot = btree.@get_slot(compare_uints, number);
 
-        assert(slot.existed);
+        assert(slot.has_item());
         assert(slot.get() == number);
     }
 
@@ -232,10 +231,11 @@ fn void parametric_test_for_remove_if(sz number_of_items_to_insert)
         uint new = r.next_int();
         generated++;
 
-        BTreeSlot{uint} slot = btree.@get_slot(compare_uints, new);
+        bool created;
+        BTreeSlot{uint} slot = btree.@get_or_create_slot(compare_uints, new, created: &created);
 
         // Only insert if the number wans't there before.
-        if (!slot.existed)
+        if (created)
         {
             slot.set(new);
             inserted++;
@@ -275,16 +275,14 @@ fn void parametric_test_for_remove_if(sz number_of_items_to_insert)
         uint number = r2.next_int();
 
         BTreeSlot{uint} slot;
-        slot = btree.@get_existing_slot(compare_uints, number);
+        slot = btree.@get_slot(compare_uints, number);
 
         if (number % 2 == 0)
         {
-            assert(!slot.existed);
             assert(!slot.has_item());
         }
         else
         {
-            assert(slot.existed);
             assert(slot.has_item());
             assert(slot.get() == number);
         }
@@ -342,10 +340,11 @@ macro void @parametric_test_remove_and_go(bool $go_to_next, sz number_of_items_t
         uint new = r.next_int();
         generated++;
 
-        BTreeSlot{uint} slot = btree.@get_slot(compare_uints, new);
+        bool created;
+        BTreeSlot{uint} slot = btree.@get_or_create_slot(compare_uints, new, created: &created);
 
         // Only insert if the number wans't there before.
-        if (!slot.existed)
+        if (created)
         {
             slot.set(new);
             inserted.push(new);
@@ -366,9 +365,8 @@ macro void @parametric_test_remove_and_go(bool $go_to_next, sz number_of_items_t
         if (!slot.has_item() || random::next(&r, 4) == 0)
         {
             idx = random::next(&r, (int)inserted.len());
-            slot = btree.@get_existing_slot(compare_uints, inserted[idx]);
+            slot = btree.@get_slot(compare_uints, inserted[idx]);
         }
-        assert(slot.existed);
         assert(slot.has_item());
         assert(slot.get() == inserted[idx]);
         inserted.remove_at(idx);
@@ -381,13 +379,11 @@ macro void @parametric_test_remove_and_go(bool $go_to_next, sz number_of_items_t
         $endif
         if (has_another_item)
         {
-            assert(slot.existed);
             assert(slot.has_item());
             assert(slot.get() == inserted[idx]);
         }
         else
         {
-            assert(!slot.existed);
             assert(!slot.has_item());
             $if $go_to_next:
                 assert(idx == inserted.len());

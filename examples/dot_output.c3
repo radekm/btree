@@ -18,7 +18,7 @@ fn void main()
     {
         int elem = i * 10;
         BTreeSlot{int} slot;
-        slot = btree.@get_slot(compare_ints, elem);
+        slot = btree.@get_or_create_slot(compare_ints, elem);
         slot.set(elem);
     }
     // Insert items between existing items.
@@ -26,7 +26,7 @@ fn void main()
     {
         int elem = i;
         BTreeSlot{int} slot;
-        slot = btree.@get_slot(compare_ints, elem);
+        slot = btree.@get_or_create_slot(compare_ints, elem);
         slot.set(elem);
     }
 

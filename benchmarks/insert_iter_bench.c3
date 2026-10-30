@@ -17,7 +17,7 @@ fn void main()
 
         for (int i = 1; i <= 100_000_000; i++)
         {
-            BTreeSlot{int} slot = set.@get_slot(&compare_int, i);
+            BTreeSlot{int} slot = set.@get_or_create_slot(&compare_int, i);
             slot.set(i);
         }
 

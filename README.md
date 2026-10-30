@@ -6,7 +6,11 @@ Its API is currently low-level, but straightforward.
 The generic type `BTree` represents a B-tree instance. It is initialized using the `init` method
 and freed using the `free` method.
 
-The macros `@get_slot`, `@get_existing_slot`, and `@remove` are used to add, modify, and remove items.
+The macros `@get_or_create_slot`, `@get_slot`, and `@remove` are used to add, modify, and remove items.
+`@get_slot` finds an existing item; if it's not found the returned slot is empty (`has_item()` returns false).
+`@get_or_create_slot` finds an existing item or creates a new one. A newly created item is zeroed
+and the caller must set it. To find out whether the item was created pass the optional named argument
+`created`, eg. `tree.@get_or_create_slot(cmp, key, created: &created)`.
 These macros take a function that performs the comparison. The function takes one or more arguments.
 The last argument is always `item_from_tree`. The function returns a comparison result:
 
@@ -24,8 +28,8 @@ only bid or ask orders, respectively - and organize them by `price`, `entry_time
 
 ## Handling out of memory
 
-Function `init` always allocates memory, macro `@get_slot` allocates memory if it needs to split some nodes.
-Both will panic if they run out of memory. But there's another interface: `init_try` and `@get_slot_try`
+Function `init` always allocates memory, macro `@get_or_create_slot` allocates memory if it needs to split some nodes.
+Both will panic if they run out of memory. But there's another interface: `init_try` and `@get_or_create_slot_try`
 which in case of an allocator error simply return the error and don't change the B-tree.
 So the B-tree can be safely used even after they fail with out of memory.
 

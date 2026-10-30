@@ -72,10 +72,11 @@ fn void parametric_test_oom(sz number_of_items_to_insert, sz min_expected_height
         generated++;
 
         BTreeSlot{uint} slot;
+        bool created;
         while (true)
         {
             if (allocator.ooms > number_of_items_to_insert) abort("Too many OOMs");
-            BTreeSlot{uint}? slot_or_excuse = btree.@get_slot_try(compare_uints, new);
+            BTreeSlot{uint}? slot_or_excuse = btree.@get_or_create_slot_try(compare_uints, new, created: &created);
             if (try slot_or_excuse)
             {
                 slot = slot_or_excuse;
@@ -84,7 +85,7 @@ fn void parametric_test_oom(sz number_of_items_to_insert, sz min_expected_height
         }
 
         // Only insert if the number wans't there before.
-        if (!slot.existed)
+        if (created)
         {
             slot.set(new);
             inserted++;

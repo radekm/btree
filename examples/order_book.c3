@@ -147,26 +147,27 @@ fn void OrderBook.add_order_to_by_priority_index(&self, OrderHandle handle)
 {
     Order* order = self.orders.get_ref(handle);
     BTreeSlot{OrderHandle} slot;
+    bool created;
     if (order.side == BID)
     {
-        slot = self.bid_by_priority.@get_slot(
+        slot = self.bid_by_priority.@get_or_create_slot(
             fn int(Pool{Order}* orders, Order* order, OrderHandle item_from_tree) {
                 Order* cur_order = orders.get_ref(item_from_tree);
                 return compare_bid_by_priority(order, cur_order);
             },
-            &self.orders, order);
+            &self.orders, order, created: &created);
     }
     else
     {
-        slot = self.ask_by_priority.@get_slot(
+        slot = self.ask_by_priority.@get_or_create_slot(
             fn int(Pool{Order}* orders, Order* order, OrderHandle item_from_tree) {
                 Order* cur_order = orders.get_ref(item_from_tree);
                 return compare_ask_by_priority(order, cur_order);
             },
-            &self.orders, order);
+            &self.orders, order, created: &created);
     }
 
-    if (slot.existed) abort("Order already exists in by priority index");
+    if (!created) abort("Order already exists in by priority index");
     slot.set(handle);
 }
 
@@ -196,16 +197,17 @@ fn void OrderBook.remove_order_from_by_priority_index(&self, Order* order)
 
 fn void OrderBook.add_or_update_order(&self, Order order)
 {
-    BTreeSlot{OrderHandle} slot = self.orders_by_id.@get_slot(
+    bool created;
+    BTreeSlot{OrderHandle} slot = self.orders_by_id.@get_or_create_slot(
         fn int(Pool{Order}* orders, Order order, OrderHandle item_from_tree) {
             OrderId existing_order_id = orders.get_ref(item_from_tree).order_id;
             return compare_order_id(order.order_id, existing_order_id);
         },
-        &self.orders, order);
+        &self.orders, order, created: &created);
 
     OrderHandle handle;
     Order* order_slot;  // Slot in the pool.
-    if (slot.existed)
+    if (!created)
     {
         handle = slot.get();
         order_slot = self.orders.get_ref(handle);
