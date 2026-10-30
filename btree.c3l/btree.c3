@@ -16,7 +16,7 @@ struct SearchResult
 // Its last argument is an item from the tree.
 // It returns value lower than zero if we search for something smaller than the item from the tree.
 // It returns value higher than zero if we search for something bigger than the item from the tree.
-// Otherwise the item from the tree is what we search for and `#comparison` returns zero.
+// Otherwise the item from the tree is what we search for and `#compare` returns zero.
 //
 // The most common usage is that `...` contains context needed for comparison
 // and key we search for. In that case `#compare` is called as `#compare(ctx1, ctx2, ctx3, key, item_from_tree)`
