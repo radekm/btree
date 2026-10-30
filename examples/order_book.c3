@@ -229,18 +229,19 @@ fn void OrderBook.add_or_update_order(&self, Order order)
 
 fn void OrderBook.remove_order(&self, OrderId order_id)
 {
-    OrderHandle handle;
-    bool removed = self.orders_by_id.@remove(
-        fn int(OrderHandle* handle, Pool{Order}* orders, OrderId order_id, OrderHandle item_from_tree) {
+    BTreeSlot{OrderHandle} slot = self.orders_by_id.@get_slot(
+        fn int(Pool{Order}* orders, OrderId order_id, OrderHandle item_from_tree) {
             OrderId existing_order_id = orders.get_ref(item_from_tree).order_id;
-            *handle = item_from_tree;  // Note which handle was removed.
             return compare_order_id(order_id, existing_order_id);
         },
-        &handle, &self.orders, order_id);
+        &self.orders, order_id);
 
-    if (!removed) abort("Order not removed because it was not found");
+    if (!slot.has_item()) abort("Order not removed because it was not found");
 
-    // At this point `handle` contains handle of the removed order.
+    // Read the handle before the item is removed from the tree.
+    OrderHandle handle = slot.get();
+    slot.remove();
+
     self.remove_order_from_by_priority_index(self.orders.get_ref(handle));
 
     self.orders.remove(handle);

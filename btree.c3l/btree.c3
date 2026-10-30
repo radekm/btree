@@ -129,10 +129,27 @@ struct BTreeSlot
 }
 
 fn bool BTreeSlot.has_item(self) @inline => (bool)self.tree;
+
+<*
+ @require self.has_item() : "Slot is empty"
+*>
 fn Type* BTreeSlot.get_ref(self) @inline => &self.handle.node_ref.node.items[self.handle.item_idx];
+
+<*
+ @require self.has_item() : "Slot is empty"
+*>
 fn Type BTreeSlot.get(self) @inline => *self.get_ref();
+
+<*
+ @require self.has_item() : "Slot is empty"
+*>
 fn void BTreeSlot.set(self, Type item) @inline => *self.get_ref() = item;
-// Slot must not be used after calling `remove`.
+
+<*
+ Removes the item. After that the slot is empty.
+
+ @require self.has_item() : "Slot is empty"
+*>
 fn void BTreeSlot.remove(&self) @inline
 {
     self.handle.remove_item(&self.tree.root, self.tree.allocator);
@@ -140,6 +157,11 @@ fn void BTreeSlot.remove(&self) @inline
     *self = {};
 }
 
+<*
+ Moves to the next item. If there's no next item then the slot becomes empty and false is returned.
+
+ @require self.has_item() : "Slot is empty"
+*>
 fn bool BTreeSlot.next(&self)
 {
     if (handle_item_next_item(self.handle, &self.handle)) return true;
@@ -149,6 +171,11 @@ fn bool BTreeSlot.next(&self)
     return false;
 }
 
+<*
+ Moves to the previous item. If there's no previous item then the slot becomes empty and false is returned.
+
+ @require self.has_item() : "Slot is empty"
+*>
 fn bool BTreeSlot.prev(&self)
 {
     if (handle_item_prev_item(self.handle, &self.handle)) return true;
@@ -158,6 +185,12 @@ fn bool BTreeSlot.prev(&self)
     return false;
 }
 
+<*
+ Removes the item and moves to the next item.
+ If there's no next item then the slot becomes empty and false is returned.
+
+ @require self.has_item() : "Slot is empty"
+*>
 fn bool BTreeSlot.remove_and_go_to_next(&self)
 {
     NodeRef* orig_root = &self.tree.root;
@@ -184,6 +217,12 @@ fn bool BTreeSlot.remove_and_go_to_next(&self)
     return found_next;
 }
 
+<*
+ Removes the item and moves to the previous item.
+ If there's no previous item then the slot becomes empty and false is returned.
+
+ @require self.has_item() : "Slot is empty"
+*>
 fn bool BTreeSlot.remove_and_go_to_prev(&self)
 {
     NodeRef* orig_root = &self.tree.root;
