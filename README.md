@@ -2,6 +2,7 @@
 
 The `btree.c3l` library provides an implementation of a B-tree.
 Its API is currently low-level, but straightforward.
+The public API is documented in [docs/api.md](docs/api.md).
 
 The generic type `BTree` represents a B-tree instance. It is initialized using the `init` method
 and freed using the `free` method.

@@ -501,7 +501,7 @@ fn void BTree.free(&self)
 //       stop somewhere else (not necessarily at the end) and later resume walking where we stopped.
 
 // Calls `@body` for each item in the tree in ascending order.
-// `@body` may modify the item but it must not change its position in the ordering,
+// `@body` may freely modify the item as long as it stays between its neighbours,
 // ie. the modified item must still be greater than the item before it and less than the item after it.
 // `@body` must not insert items into the tree or remove items from the tree.
 <*
@@ -816,7 +816,7 @@ fn Type? BTree.last_item(&self)
 
 // Calls `@body` for each item in the tree in ascending order
 // and removes the item if `@body` sets `*remove` to true.
-// `@body` may modify the item but it must not change its position in the ordering,
+// `@body` may freely modify the item as long as it stays between its neighbours,
 // ie. the modified item must still be greater than the item before it and less than the item after it.
 // `@body` must not insert items into the tree or remove items from the tree
 // (other than by setting `*remove`).
