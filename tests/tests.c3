@@ -214,7 +214,7 @@ fn void test_bigger() @test
 //     parametric_test(false, 429_981_696, 8);
 // }
 
-macro void @parametric_test_for_remove_if(sz number_of_items_to_insert)
+fn void parametric_test_for_remove_if(sz number_of_items_to_insert)
 {
     BTree{uint} btree;
     btree.init(mem);
@@ -318,6 +318,102 @@ fn void test_remove_if_small() @test
     // items can fit into tree with 4 levels. Having one more item guarantees at least 5 levels.
     for (int i; i < 100; i++)
     {
-        @parametric_test_for_remove_if(20736);
+        parametric_test_for_remove_if(20736);
+    }
+}
+
+macro void @parametric_test_remove_and_go(bool $go_to_next, sz number_of_items_to_insert)
+{
+    BTree{uint} btree;
+    btree.init(mem);
+    defer btree.free();
+
+    char[8 * 4] entropy = random::entropy();
+    Sfc64Random r;
+    r.set_seed(&entropy);
+    sz generated;
+
+    List{uint} inserted;
+    inserted.init(mem, initial_capacity: number_of_items_to_insert);
+    defer inserted.free();
+
+    while (inserted.len() < number_of_items_to_insert)
+    {
+        uint new = r.next_int();
+        generated++;
+
+        BTreeSlot{uint} slot = btree.@get_slot(compare_uints, new);
+
+        // Only insert if the number wans't there before.
+        if (!slot.existed)
+        {
+            slot.set(new);
+            inserted.push(new);
+        }
+    }
+
+    io::printfn("Generated %d, inserted %d", generated, inserted.len());
+
+    btree.check_invariants_and_orderding(inserted.len());
+
+    quicksort(&inserted);
+
+    while (inserted.len() > 0)
+    {
+        sz idx = random::next(&r, (int)inserted.len());
+        BTreeSlot{uint} slot = btree.@get_existing_slot(compare_uints, inserted[idx]);
+        assert(slot.existed);
+        assert(slot.has_item());
+        assert(slot.get() == inserted[idx]);
+        $if $go_to_next:
+            bool another_item = slot.remove_and_go_to_next();
+            sz another_idx = idx + 1;
+        $else
+            bool another_item = slot.remove_and_go_to_prev();
+            sz another_idx = idx - 1;
+        $endif
+        if (another_item)
+        {
+            assert(slot.existed);
+            assert(slot.has_item());
+            assert(slot.get() == inserted[another_idx]);
+        }
+        else
+        {
+            assert(!slot.existed);
+            assert(!slot.has_item());
+            $if $go_to_next:
+                assert(another_idx == inserted.len());
+            $else
+                assert(another_idx == -1);
+            $endif
+        }
+        inserted.remove_at(idx);
+    }
+
+    // Check empty tree.
+    assert(btree.root.height == 0);
+    btree.check_invariants_and_orderding(0);
+}
+
+fn void test_remove_and_go_to_next_small() @test
+{
+    // We want to create tree with at least 5 levels (height 4).
+    // 20735 (= 12^0 * 11 + 12^1 * 11 + 12^2 * 11 + 12^3 * 11)
+    // items can fit into tree with 4 levels. Having one more item guarantees at least 5 levels.
+    for (int i; i < 100; i++)
+    {
+        @parametric_test_remove_and_go(true, 20736);
+    }
+}
+
+fn void test_remove_and_go_to_prev_small() @test
+{
+    // We want to create tree with at least 5 levels (height 4).
+    // 20735 (= 12^0 * 11 + 12^1 * 11 + 12^2 * 11 + 12^3 * 11)
+    // items can fit into tree with 4 levels. Having one more item guarantees at least 5 levels.
+    for (int i; i < 100; i++)
+    {
+        @parametric_test_remove_and_go(false, 20736);
     }
 }
