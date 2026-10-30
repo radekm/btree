@@ -1,6 +1,5 @@
 module btree <Type>;
 
-import std::collections::maybe;
 import std::io;
 
 struct SearchResult
@@ -96,6 +95,9 @@ struct BTree
 }
 
 // If there's not enough memory this function will panic and B-tree won't be initialized.
+<*
+ @require self.root.node == null : "B-tree is already initialized"
+*>
 fn void BTree.init(&self, Allocator allocator)
 {
     LeafNode* node = alloc::new(allocator, LeafNode);
@@ -107,6 +109,9 @@ fn void BTree.init(&self, Allocator allocator)
 
 // If there is not enough memory this function will return `mem::OUT_OF_MEMORY`
 // and B-tree won't be initialized.
+<*
+ @require self.root.node == null : "B-tree is already initialized"
+*>
 fn void? BTree.init_try(&self, Allocator allocator)
 {
     LeafNode* node = alloc::new_try(allocator, LeafNode)!;
@@ -247,6 +252,9 @@ fn bool BTreeSlot.remove_and_go_to_prev(&self)
 }
 
 // Finds an existing item. If the item is not found then the returned slot is empty.
+<*
+ @require self.root.node != null : "B-tree is not initialized"
+*>
 macro BTreeSlot BTree.@get_slot(&self, #compare, ...)
 {
     SearchResult sr = self.root.@search_tree(#compare, ...$vaarg);
@@ -271,6 +279,9 @@ macro BTreeSlot BTree.@get_slot(&self, #compare, ...)
 // it must be passed by name: `tree.@get_or_create_slot(cmp, key, created: &created)`.
 //
 // If there's not enough memory this function will panic.
+<*
+ @require self.root.node != null : "B-tree is not initialized"
+*>
 macro BTreeSlot BTree.@get_or_create_slot(&self, #compare, ..., bool* created = null)
 {
     SearchResult sr = self.root.@search_tree(#compare, ...$vaarg);
@@ -360,6 +371,9 @@ fn void Preallocator.release(&self, void* old_ptr, bool aligned) @dynamic
 // Same as `@get_or_create_slot` but if there is not enough memory
 // this function will return `mem::OUT_OF_MEMORY` and B-tree won't be changed
 // (`*created` won't be changed either).
+<*
+ @require self.root.node != null : "B-tree is not initialized"
+*>
 macro BTreeSlot? BTree.@get_or_create_slot_try(&self, #compare, ..., bool* created = null)
 {
     SearchResult sr = self.root.@search_tree(#compare, ...$vaarg);
@@ -410,6 +424,9 @@ macro BTreeSlot? BTree.@get_or_create_slot_try(&self, #compare, ..., bool* creat
     return { .handle = handle, .tree = self };
 }
 
+<*
+ @require self.root.node != null : "B-tree is not initialized"
+*>
 macro bool BTree.@remove(&self, #compare, ...)
 {
     SearchResult sr = self.root.@search_tree(#compare, ...$vaarg);
@@ -482,6 +499,14 @@ fn void BTree.free(&self)
 // TODO: Create a generalized `@each` which walks the tree from the given `HandleEdge`.
 //       It would be nice to start walking through the tree at some `HandleEdge`
 //       stop somewhere else (not necessarily at the end) and later resume walking where we stopped.
+
+// Calls `@body` for each item in the tree in ascending order.
+// `@body` may modify the item but it must not change its position in the ordering,
+// ie. the modified item must still be greater than the item before it and less than the item after it.
+// `@body` must not insert items into the tree or remove items from the tree.
+<*
+ @require self.root.node != null : "B-tree is not initialized"
+*>
 macro void BTree.@each(&self; @body(Type* item_from_tree))
 {
     HandleEdge edge = { .node_ref = self.root };
@@ -566,7 +591,11 @@ macro void? NodeRef.@output_dot_node(self, #output_item, OutStream out, ...)
     io::fprintn(out, "</TR></TABLE> >];")!;
 }
 
-// `@body` outputs item from tree to `out`.
+// `#output_item` outputs item from tree to `out`.
+// It's called as `#output_item(out, ..., item_from_tree)`.
+<*
+ @require self.root.node != null : "B-tree is not initialized"
+*>
 macro void? BTree.@to_dot(&self, #output_item, OutStream out, ...)
 {
     if (!self.root.node) abort("Node is not initialized");
@@ -646,6 +675,9 @@ macro void? BTree.@to_dot(&self, #output_item, OutStream out, ...)
 
 // Checks same invariants as `@to_dot` but it's faster since it doesn't generate any output.
 // Ordering isn't checked.
+<*
+ @require self.root.node != null : "B-tree is not initialized"
+*>
 fn void BTree.check_invariants(&self)
 {
     if (!self.root.node) abort("Node is not initialized");
@@ -706,6 +738,9 @@ fn void BTree.check_invariants(&self)
     }
 }
 
+<*
+ @require self.root.node != null : "B-tree is not initialized"
+*>
 fn BTreeSlot BTree.first_slot(&self)
 {
     if (!self.number_of_items) return {};
@@ -730,6 +765,9 @@ fn BTreeSlot BTree.first_slot(&self)
     };
 }
 
+<*
+ @require self.root.node != null : "B-tree is not initialized"
+*>
 fn Type? BTree.first_item(&self)
 {
     BTreeSlot slot = self.first_slot();
@@ -738,6 +776,9 @@ fn Type? BTree.first_item(&self)
     return slot.get();
 }
 
+<*
+ @require self.root.node != null : "B-tree is not initialized"
+*>
 fn BTreeSlot BTree.last_slot(&self)
 {
     if (!self.number_of_items) return {};
@@ -762,6 +803,9 @@ fn BTreeSlot BTree.last_slot(&self)
     };
 }
 
+<*
+ @require self.root.node != null : "B-tree is not initialized"
+*>
 fn Type? BTree.last_item(&self)
 {
     BTreeSlot slot = self.last_slot();
@@ -770,6 +814,15 @@ fn Type? BTree.last_item(&self)
     return slot.get();
 }
 
+// Calls `@body` for each item in the tree in ascending order
+// and removes the item if `@body` sets `*remove` to true.
+// `@body` may modify the item but it must not change its position in the ordering,
+// ie. the modified item must still be greater than the item before it and less than the item after it.
+// `@body` must not insert items into the tree or remove items from the tree
+// (other than by setting `*remove`).
+<*
+ @require self.root.node != null : "B-tree is not initialized"
+*>
 macro void BTree.@remove_if(&self; @body(Type* item_from_tree, bool* remove))
 {
     BTreeSlot slot = self.first_slot();
