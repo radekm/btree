@@ -9,8 +9,9 @@ and freed using the `free` method.
 The macros `@get_or_create_slot`, `@get_slot`, and `@remove` are used to add, modify, and remove items.
 `@get_slot` finds an existing item; if it's not found the returned slot is empty (`has_item()` returns false).
 `@get_or_create_slot` finds an existing item or creates a new one. A newly created item is zeroed
-and the caller must set it. To find out whether the item was created pass the optional named argument
-`created`, eg. `tree.@get_or_create_slot(cmp, key, created: &created)`.
+and the caller must set it to a value which fits between its neighbours, so the tree stays ordered.
+To find out whether the item was created pass the optional named argument `created`,
+eg. `tree.@get_or_create_slot(cmp, key, created: &created)`.
 These macros take a function that performs the comparison. The function takes one or more arguments.
 The last argument is always `item_from_tree`. The function returns a comparison result:
 

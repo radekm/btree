@@ -224,7 +224,8 @@ macro BTreeSlot BTree.@get_slot(&self, #compare, ...)
 
 // Finds an existing item or creates a new one. The returned slot is never empty.
 // The new item is zeroed and the caller must immediately set it (via `set` or `get_ref`)
-// to a value which is equal to the searched one (ie. `#compare` returns zero for it).
+// to a value which keeps the tree ordered: the value must be greater than the item before it
+// and less than the item after it (ie. the items `prev` and `next` would move the slot to).
 //
 // If `created` is non-null then `*created` is set to true if a new item was created
 // and to false if the item already existed. Since `created` follows variadic arguments
