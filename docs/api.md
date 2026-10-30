@@ -320,6 +320,51 @@ if (catch err = slot)
 
 Removal never allocates.
 
+### Pattern: insertion which may fail
+
+Often the item itself needs memory too (for example a copy of a string key), and that allocation
+can only happen after the slot was created. If it fails, remove the newly created item through
+the slot. Removal never allocates, so this rollback can't fail and the tree ends up
+exactly as it was before:
+
+```c3
+struct Item
+{
+    String name;
+    int value;
+}
+
+fn int compare_items(String name, Item item_from_tree) => name.compare_to(item_from_tree.name);
+
+// Inserts a copy of `name` or updates the value of an existing item.
+// If there's not enough memory the tree stays unchanged.
+fn void? put(BTree{Item}* tree, Allocator allocator, String name, int value)
+{
+    bool created;
+    BTreeSlot{Item} slot = tree.@get_or_create_slot_try(compare_items, name, created: &created)!;
+    if (created)
+    {
+        // The tree now contains a zeroed item. Don't search the tree until it's set or removed.
+        char[]? copy = alloc::new_array_try(allocator, char, name.len);
+        if (catch err = copy)
+        {
+            slot.remove();  // The tree is the same as before the call.
+            return err~;
+        }
+        copy[..] = name[..];
+        slot.set({ .name = (String)copy, .value = value });
+    }
+    else
+    {
+        slot.get_ref().value = value;
+    }
+}
+```
+
+Removing the zeroed item is safe because removal through a slot doesn't call
+the comparison function. The same pattern works for any other fallible step
+which has to happen between creating and setting the item.
+
 ## Debugging helpers
 
 | Function | Description |
